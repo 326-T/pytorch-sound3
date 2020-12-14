@@ -158,7 +158,7 @@ class IMUs:
             acc_max.append(np.max(self.data[i+1] - acc_mean[-1]))
         for i in range(1, len(self.data[0])):
             if(i > pre_index + 100
-               and self.data[3][i] - acc_mean[2] > acc_max[2] / 1.5):
+               and self.data[3][i] - acc_mean[2] > acc_max[2] / 3.5):
                 sound_name = self.ex_path + '_' + str(count)
                 self.devided.append(IMU(sound_name, self.data[:, i-self.size : i+self.size], self.columns, i-self.size, i+self.size, self.frame_rate))
                 pre_index = i
@@ -229,7 +229,7 @@ def IMUs_all(folderpath, save_path):
 
 if __name__ == "__main__":
     #IMUs_all("../../data/original/3DM_GX3/sub7", "../../data/3DM_GX3s/raw/sub7")
-    #fft_all("../../data/original/3DM_GX3/sub7/sub7_flick_002", "../../data/3DM_GX3s/raw/sub7/sub7_flick_002")    
-
+    fft_all("../../data/original/3DM_GX3/sub11/sub11_drive_002", "../../data/3DM_GX3s/raw/sub11/sub11_drive_002")
+    
 
 

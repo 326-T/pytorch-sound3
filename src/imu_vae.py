@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -33,20 +34,22 @@ from modules.myfunc import ans2index_label_color_marker
 from modules.success_and_false import result, results_list
 
 
-class VAE(nn.Module):
+class IMU_VAE(nn.Module):
     def __init__(self,input_shape,z_shape=10,output_shape=11):
-        super(VAE, self).__init__()
+        super(IMU_VAE, self).__init__()
         
         self.input_shape = input_shape
         self.z_shape = z_shape
         self.output_shape = output_shape
         
         # encoder
-        self.encoder = nn.Sequential()
-        self.encoder.add_module('enc_conv1', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=10, stride=5, padding=3, padding_mode='zeros'))
-        self.encoder.add_module('enc_relu1', nn.ReLU(True))
-        self.encoder.add_module('enc_conv2', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=4, stride=2, padding=1, padding_mode='zeros'))
-        self.encoder.add_module('enc_relu2', nn.ReLU(True))
+        #self.encoder = nn.Sequential()
+        #self.encoder.add_module('enc_conv1', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=10, stride=5, padding=3, padding_mode='zeros'))
+        #self.encoder.add_module('enc_relu1', nn.ReLU(True))
+        #self.encoder.add_module('enc_conv2', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=4, stride=2, padding=1, padding_mode='zeros'))
+        #self.encoder.add_module('enc_relu2', nn.ReLU(True))
+        self.enc_conv1 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=10, stride=5, padding=3, padding_mode='zeros')
+        self.enc_conv2 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=4, stride=2, padding=1, padding_mode='zeros')
         # z to mean
         self.encmean_fc11 = nn.Linear(90, z_shape)
         # z to var
@@ -66,7 +69,9 @@ class VAE(nn.Module):
         
     def encode(self, x):
         x = x.view(x.size()[0],9,-1)
-        x = self.encoder(x)
+        #x = self.encoder(x)
+        x = F.relu(self.enc_conv1(x))
+        x = F.relu(self.enc_conv2(x))
         x = x.view(x.size()[0], -1)
         return self.encmean_fc11(x), self.encvar_fc12(x)
 
@@ -115,7 +120,7 @@ class VAE(nn.Module):
         return correct
 
 
-class VAE_trainer():
+class IMU_VAE_trainer():
     def __init__(self, dim_z = 10, device="cuda"):
         # prepare cuda device
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
@@ -123,7 +128,7 @@ class VAE_trainer():
         # prepare dataset
         self.dataset = IMUDataset(transform=transforms.ToTensor())
         # define model
-        self.model = VAE(self.dataset.data_size, dim_z).to(self.device)
+        self.model = IMU_VAE(self.dataset.data_size, dim_z).to(self.device)
         # define optimizer
         self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
         self.dim_z = dim_z
@@ -210,7 +215,7 @@ class VAE_trainer():
         
         return valid_loss, valid_loss_vae, valid_loss_classifier, valid_acc
         
-    def auto_train(self, max_epoch, save_path = '../result/IMU_VAE/model'):
+    def auto_train(self, max_epoch, save_path = None):
         train_set, valid_set = torch.utils.data.random_split(self.dataset, [int(len(self.dataset)*0.8), len(self.dataset) - int(len(self.dataset)*0.8)])
         self.train_loader = torch.utils.data.DataLoader(train_set,batch_size=10,shuffle=True)
         self.valid_loader = torch.utils.data.DataLoader(valid_set,batch_size=10,shuffle=True)
@@ -235,29 +240,30 @@ class VAE_trainer():
             valid_loss_classifier.append(v_loss_classifier)
             valid_acc.append(v_acc)
         # plot result
-        fig, ax = plt.subplots(4,1,figsize=(8, 16))
-        ax[0].set_title('Loss')
-        ax[1].set_title('VAE Loss')
-        ax[2].set_title('Classifier Loss')
-        ax[3].set_title('Accuracy')
-        for i in range(3):
-            ax[i].set_xlabel('Epochs')
-            ax[i].set_ylabel('Loss')
-        ax[0].plot(range(1,max_epoch),train_loss,label="train")
-        ax[0].plot(range(1,max_epoch),valid_loss,label="validation")
-        ax[1].plot(range(1,max_epoch),train_loss_vae,label="train")
-        ax[1].plot(range(1,max_epoch),valid_loss_vae,label="validation")
-        ax[2].plot(range(1,max_epoch),train_loss_classifier,label="train")
-        ax[2].plot(range(1,max_epoch),valid_loss_classifier,label="validation")
-        ax[3].set_xlabel('Epochs')
-        ax[3].set_ylabel('Accuracy')
-        ax[3].plot(range(1,max_epoch),train_acc,label="train")
-        ax[3].plot(range(1,max_epoch),valid_acc,label="validation")
-        for i in range(3):
-            ax[i].legend()
-        plt.tight_layout()
-        plt.savefig(save_path+'/loss.png')
-        plt.close()
+        if save_path is not None:
+            fig, ax = plt.subplots(4,1,figsize=(8, 16))
+            ax[0].set_title('Loss')
+            ax[1].set_title('VAE Loss')
+            ax[2].set_title('Classifier Loss')
+            ax[3].set_title('Accuracy')
+            for i in range(3):
+                ax[i].set_xlabel('Epochs')
+                ax[i].set_ylabel('Loss')
+            ax[0].plot(range(1,max_epoch),train_loss,label="train")
+            ax[0].plot(range(1,max_epoch),valid_loss,label="validation")
+            ax[1].plot(range(1,max_epoch),train_loss_vae,label="train")
+            ax[1].plot(range(1,max_epoch),valid_loss_vae,label="validation")
+            ax[2].plot(range(1,max_epoch),train_loss_classifier,label="train")
+            ax[2].plot(range(1,max_epoch),valid_loss_classifier,label="validation")
+            ax[3].set_xlabel('Epochs')
+            ax[3].set_ylabel('Accuracy')
+            ax[3].plot(range(1,max_epoch),train_acc,label="train")
+            ax[3].plot(range(1,max_epoch),valid_acc,label="validation")
+            for i in range(3):
+                ax[i].legend()
+            plt.tight_layout()
+            plt.savefig(save_path+'/loss.png')
+            plt.close()
         
     def save_weight(self, save_path = '../result/IMU_VAE/model/vae'):
         torch.save(self.model.state_dict(), save_path)
@@ -305,6 +311,7 @@ class VAE_trainer():
         plot_z(ica_z[0], ica_z[1], all_ans, "z map", save_path.split('.png')[0] + '_ICA.png', z_xrange, z_yrange)
         plot_z_each(ica_z, all_ans, self.dataset.filenames, '../data/succeed_list_imu.csv', "z map",
                    save_path.split('.png')[0] + '_ICA_each.png', z_xrange, z_yrange)
+        return all_z, all_ans, ica_z.transpose()
         
     def reconstruct(self, save_path = '../result/IMU_VAE/reconstructed_3DM_GX3s'):
         loader = torch.utils.data.DataLoader(self.dataset,batch_size=1,shuffle=False)
@@ -319,17 +326,9 @@ class VAE_trainer():
                 recon_x = recon_x.reshape(9, -1)
                 # to png
                 fig, ax = plt.subplots(3,3,figsize=(24, 24))
-                ax[0][0].set_title('Pitch Y')
-                ax[1][0].set_title('Roll X')
-                ax[2][0].set_title('Heading Z')
-                ax[0][1].set_title('Acc X')
-                ax[1][1].set_title('Acc Y')
-                ax[2][1].set_title('Acc Z')
-                ax[0][2].set_title('AR X')
-                ax[1][2].set_title('AR Y')
-                ax[2][2].set_title('AR Z')
                 time = range(len(x[0]))
                 for j in range(9):
+                    ax[j%3][j//3].set_title(self.dataset.columns[j])
                     ax[j%3][j//3].set_ylim(0, 1)
                     ax[j%3][j//3].plot(time, x[j], linewidth = 1, label='raw')
                     ax[j%3][j//3].plot(time, recon_x[j], linewidth = 1, label='reconstructed')
@@ -392,7 +391,7 @@ def plot_z_each(data, ans, names, sf_filepath, title, save_path, xrange=None, yr
 
 
 def train_VAE(key):
-    vae = VAE_trainer()
+    vae = IMU_VAE_trainer()
     #vae.load_weight(load_path =  '../result/VAE/' + key + '/vae')
     vae.load(key)
     vae.auto_train(1000, save_path = '../result/IMU_VAE/' + key)
@@ -402,12 +401,65 @@ def train_VAE(key):
     del vae
 
 
+from modules.gradcam import GradCAM, GradCAMpp
+
+
+def Grad_CAM(vae, model_dict, key, pp_mode=True):
+    
+    if pp_mode:
+        gradcam = GradCAMpp(model_dict)
+    else:
+        gradcam = GradCAM(model_dict)
+    
+    src_loader = torch.utils.data.DataLoader(vae.dataset,batch_size=1,shuffle=False)
+    # test mode
+    for i, (data, label) in enumerate(src_loader):
+        pre_class, mask = gradcam(data, label)
+        data=data.detach().clone().numpy()
+        data=(data[0]-np.min(data[0]))/(np.max(data[0])-np.min(data[0]))
+        mask=mask.detach().clone().numpy()
+        
+        fig, ax = plt.subplots(3,3,figsize=(24,24))
+        for j in range(9):
+            ax[j%3][j//3].set_title(vae.dataset.columns[j])
+            ax[j%3][j//3].plot(range(len(mask[0])), mask[0], label = 'Grad_CAM')
+            ax[j%3][j//3].plot(range(len(data[j])), data[j], label = 'input_data')
+        plt.tight_layout()
+        
+        if pp_mode:
+            plt.savefig('../result/IMU_VAE/'+key+'/Grad_CAMpp/'+vae.dataset.filenames[i].split('.csv')[0]+'.png')
+        else:
+            plt.savefig('../result/IMU_VAE/'+key+'/Grad_CAM/'+vae.dataset.filenames[i].split('.csv')[0]+'.png')
+                       
+        plt.close()
+
+
+def IMU_VAE_Grad_CAM(key):
+    vae = IMU_VAE_trainer(device='cpu')
+    vae.load_weight(load_path='../result/IMU_VAE/'+key+'/vae')
+    vae.load(key)
+    vae.model.eval()
+    model_dict = dict(arch=vae.model, layer_name=vae.model.enc_conv2)
+    Grad_CAM(vae, model_dict, key)
+    Grad_CAM(vae, model_dict, key, pp_mode=False)
+    
+    del vae
+
+
 if __name__ == "__main__":
-    train_VAE('drive')
+    #train_VAE('drive')
     #train_VAE('block')
-    train_VAE('push')
-    train_VAE('stop')
-    train_VAE('flick')
+    #train_VAE('push')
+    #train_VAE('stop')
+    #train_VAE('flick')
+    #IMU_VAE_Grad_CAM('drive')
+    IMU_VAE_Grad_CAM('block')
+    IMU_VAE_Grad_CAM('push')
+    IMU_VAE_Grad_CAM('stop')
+    IMU_VAE_Grad_CAM('flick')
+
+
+
 
 
 

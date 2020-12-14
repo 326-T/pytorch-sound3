@@ -62,7 +62,12 @@ class SoundDataset(Dataset):
         self.data_min = np.min(self.data)
         self.data = (self.data - self.data_min) / (self.data_max - self.data_min)
         self.data_num = len(self.data)
-        
+    
+    def clear(self):
+        self.filenames.clear()
+        self.init_flag = True
+        self.data_num = 0
+    
     def __len__(self):
         return self.data_num
     
@@ -89,6 +94,8 @@ class IMUDataset(Dataset):
         ans = []
         for filename in filenames:
             x = pd.read_csv(data_path+'/'+filename, index_col = 0)
+            if(self.init_flag):
+                self.columns = x.columns.values
             x.iloc[:,:].astype('float')
             x = x.values.transpose()
             if x.shape[1] >= self.data_size:
@@ -117,6 +124,11 @@ class IMUDataset(Dataset):
         self.data = (self.data - self.data_min) / (self.data_max - self.data_min)
         self.data_num = len(self.data)
         
+    def clear(self):
+        self.filenames.clear()
+        self.init_flag = True
+        self.data_num = 0    
+    
     def __len__(self):
         return self.data_num
     
@@ -134,8 +146,4 @@ if __name__ == "__main__":
     #sound.load("../../data/sounds/raw/sub2", 'drive', 2)
     #sound.load("../../data/sounds/raw/sub3", 'drive', 3)
     #sound.normalize()
-
-
-
-
 

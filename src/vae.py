@@ -42,13 +42,16 @@ class VAE(nn.Module):
         self.output_shape = output_shape
         
         # encoder
-        self.encoder = nn.Sequential()
-        self.encoder.add_module('enc_conv1', nn.Conv1d(in_channels=3, out_channels=9, kernel_size=16, stride=10, padding=6, padding_mode='zeros'))
-        self.encoder.add_module('enc_relu1', nn.ReLU(True))
-        self.encoder.add_module('enc_conv2', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=6, padding_mode='zeros'))
-        self.encoder.add_module('enc_relu2', nn.ReLU(True))
-        self.encoder.add_module('enc_conv3', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=6, padding_mode='zeros'))
-        self.encoder.add_module('enc_relu3', nn.ReLU(True))
+        #self.encoder = nn.Sequential()
+        #self.encoder.add_module('enc_conv1', nn.Conv1d(in_channels=3, out_channels=9, kernel_size=16, stride=10, padding=6, padding_mode='zeros'))
+        #self.encoder.add_module('enc_relu1', nn.ReLU(True))
+        #self.encoder.add_module('enc_conv2', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=6, padding_mode='zeros'))
+        #self.encoder.add_module('enc_relu2', nn.ReLU(True))
+        #self.encoder.add_module('enc_conv3', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=6, padding_mode='zeros'))
+        #self.encoder.add_module('enc_relu3', nn.ReLU(True))
+        self.enc_conv1 = nn.Conv1d(in_channels=3, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros')
+        self.enc_conv2 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros')
+        self.enc_conv3 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros')
         # z to mean
         self.encmean_fc11 = nn.Linear(int(input_shape/10/10/10*9), z_shape)
         # z to var
@@ -57,11 +60,14 @@ class VAE(nn.Module):
         # decoder
         self.dec_fc1 = nn.Linear(z_shape, int(input_shape/10/10/10*9))
         self.decoder = nn.Sequential()
-        self.decoder.add_module('dec_deconv1', nn.ConvTranspose1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=3, padding_mode='zeros'))
+        self.decoder.add_module('dec_deconv1', 
+                                nn.ConvTranspose1d(in_channels=9, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros'))
         self.decoder.add_module('dec_relu1', nn.ReLU(True))
-        self.decoder.add_module('dec_deconv2', nn.ConvTranspose1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=3, padding_mode='zeros'))
+        self.decoder.add_module('dec_deconv2', 
+                                nn.ConvTranspose1d(in_channels=9, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros'))
         self.decoder.add_module('dec_relu2', nn.ReLU(True))
-        self.decoder.add_module('dec_deconv3', nn.ConvTranspose1d(in_channels=9, out_channels=3, kernel_size=16, stride=10, padding=3, padding_mode='zeros'))
+        self.decoder.add_module('dec_deconv3', 
+                                nn.ConvTranspose1d(in_channels=9, out_channels=3, kernel_size=20, stride=10, padding=5, padding_mode='zeros'))
         self.decoder.add_module('dec_sig1', nn.Sigmoid())
         
         # estimator
@@ -73,7 +79,10 @@ class VAE(nn.Module):
         
     def encode(self, x):
         x = x.view(x.size()[0],3,-1)
-        x = self.encoder(x)
+        #x = self.encoder(x)
+        x = F.relu(self.enc_conv1(x))
+        x = F.relu(self.enc_conv2(x))
+        x = F.relu(self.enc_conv3(x))
         x = x.view(x.size()[0], -1)
         return self.encmean_fc11(x), self.encvar_fc12(x)
 
@@ -114,7 +123,7 @@ class VAE(nn.Module):
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         return BCE + KLD * beta
     def loss_function_classifier(self, pre_y, y):
-        return F.cross_entropy(pre_y, y)*self.input_shape
+        return F.cross_entropy(pre_y, y)*self.input_shape*3
     
     def acc(self, pre_tar, tar):
         _, p_tar = torch.max(pre_tar, 1)
@@ -220,7 +229,7 @@ class VAE_trainer():
         
         return valid_loss, valid_loss_vae, valid_loss_classifier, valid_acc
         
-    def auto_train(self, max_epoch, save_path = '../result/VAE/model'):
+    def auto_train(self, max_epoch, save_path = None):
         train_set, valid_set = torch.utils.data.random_split(self.dataset, [int(len(self.dataset)*0.8), len(self.dataset) - int(len(self.dataset)*0.8)])
         self.train_loader = torch.utils.data.DataLoader(train_set,batch_size=10,shuffle=True)
         self.valid_loader = torch.utils.data.DataLoader(valid_set,batch_size=10,shuffle=True)
@@ -245,29 +254,30 @@ class VAE_trainer():
             valid_loss_classifier.append(v_loss_classifier)
             valid_acc.append(v_acc)
         # plot result
-        fig, ax = plt.subplots(4,1,figsize=(8, 16))
-        ax[0].set_title('Loss')
-        ax[1].set_title('VAE Loss')
-        ax[2].set_title('Classifier Loss')
-        ax[3].set_title('Accuracy')
-        for i in range(3):
-            ax[i].set_xlabel('Epochs')
-            ax[i].set_ylabel('Loss')
-        ax[0].plot(range(1,max_epoch),train_loss,label="train")
-        ax[0].plot(range(1,max_epoch),valid_loss,label="validation")
-        ax[1].plot(range(1,max_epoch),train_loss_vae,label="train")
-        ax[1].plot(range(1,max_epoch),valid_loss_vae,label="validation")
-        ax[2].plot(range(1,max_epoch),train_loss_classifier,label="train")
-        ax[2].plot(range(1,max_epoch),valid_loss_classifier,label="validation")
-        ax[3].set_xlabel('Epochs')
-        ax[3].set_ylabel('Accuracy')
-        ax[3].plot(range(1,max_epoch),train_acc,label="train")
-        ax[3].plot(range(1,max_epoch),valid_acc,label="validation")
-        for i in range(3):
-            ax[i].legend()
-        plt.tight_layout()
-        plt.savefig(save_path+'/loss.png')
-        plt.close()
+        if save_path is not None:
+            fig, ax = plt.subplots(4,1,figsize=(8, 16))
+            ax[0].set_title('Loss')
+            ax[1].set_title('VAE Loss')
+            ax[2].set_title('Classifier Loss')
+            ax[3].set_title('Accuracy')
+            for i in range(3):
+                ax[i].set_xlabel('Epochs')
+                ax[i].set_ylabel('Loss')
+            ax[0].plot(range(1,max_epoch),train_loss,label="train")
+            ax[0].plot(range(1,max_epoch),valid_loss,label="validation")
+            ax[1].plot(range(1,max_epoch),train_loss_vae,label="train")
+            ax[1].plot(range(1,max_epoch),valid_loss_vae,label="validation")
+            ax[2].plot(range(1,max_epoch),train_loss_classifier,label="train")
+            ax[2].plot(range(1,max_epoch),valid_loss_classifier,label="validation")
+            ax[3].set_xlabel('Epochs')
+            ax[3].set_ylabel('Accuracy')
+            ax[3].plot(range(1,max_epoch),train_acc,label="train")
+            ax[3].plot(range(1,max_epoch),valid_acc,label="validation")
+            for i in range(3):
+                ax[i].legend()
+            plt.tight_layout()
+            plt.savefig(save_path+'/loss.png')
+            plt.close()
         
     def save_weight(self, save_path = '../result/VAE/model/vae'):
         torch.save(self.model.state_dict(), save_path)
@@ -301,7 +311,7 @@ class VAE_trainer():
         z_xrange = [np.min(lda_z[0]), np.max(lda_z[0])]
         z_yrange = [np.min(lda_z[1]), np.max(lda_z[1])]        
         plot_z(lda_z[0], lda_z[1], all_ans, "z map", save_path.split('.png')[0] + '_LDA.png', z_xrange, z_yrange)
-        plot_z_each(lda_z, all_ans, self.dataset.filenames, '../data/succeed_list.csv', "z map",
+        plot_z_each(lda_z, all_ans, self.dataset.filenames, '../data/succeed_list_sound.csv', "z map",
                    save_path.split('.png')[0] + '_LDA_each.png', z_xrange, z_yrange)
         
         # ICA
@@ -313,8 +323,9 @@ class VAE_trainer():
         z_xrange = [np.min(ica_z[0]), np.max(ica_z[0])]
         z_yrange = [np.min(ica_z[1]), np.max(ica_z[1])]        
         plot_z(ica_z[0], ica_z[1], all_ans, "z map", save_path.split('.png')[0] + '_ICA.png', z_xrange, z_yrange)
-        plot_z_each(ica_z, all_ans, self.dataset.filenames, '../data/succeed_list.csv', "z map",
+        plot_z_each(ica_z, all_ans, self.dataset.filenames, '../data/succeed_list_sound.csv', "z map",
                    save_path.split('.png')[0] + '_ICA_each.png', z_xrange, z_yrange)
+        return all_z, all_ans, ica_z.transpose()
         
     def reconstruct(self, save_path = '../result/VAE/reconstructed_sounds'):
         loader = torch.utils.data.DataLoader(self.dataset,batch_size=1,shuffle=False)
@@ -398,49 +409,67 @@ def plot_z_each(data, ans, names, sf_filepath, title, save_path, xrange=None, yr
     plt.close()
 
 
-vae = VAE_trainer()
-#vae.load_weight(load_path =  '../result/VAE/drive/vae')
-vae.load('drive')
-vae.auto_train(1000, save_path = '../result/VAE/drive')
-vae.plot_z(save_path = '../result/VAE/drive/z_map.png')
-vae.reconstruct()
-vae.save_weight(save_path = '../result/VAE/drive/vae')
-del vae
-
-vae = VAE_trainer()
-#vae.load_weight(load_path =  '../result/VAE/block/vae')
-vae.load('block')
-vae.auto_train(1000, save_path = '../result/VAE/block')
-vae.plot_z(save_path = '../result/VAE/block/z_map.png')
-vae.reconstruct()
-vae.save_weight(save_path = '../result/VAE/block/vae')
-del vae
-
-vae = VAE_trainer()
-#vae.load_weight(load_path =  '../result/VAE/push/vae')
-vae.load('push')
-vae.auto_train(1000, save_path = '../result/VAE/push')
-vae.plot_z(save_path = '../result/VAE/push/z_map.png')
-vae.reconstruct()
-vae.save_weight(save_path = '../result/VAE/push/vae')
-del vae
-
-vae = VAE_trainer()
-#vae.load_weight(load_path =  '../result/VAE/stop/vae')
-vae.load('stop')
-vae.auto_train(1000, save_path = '../result/VAE/stop')
-vae.plot_z(save_path = '../result/VAE/stop/z_map.png')
-vae.reconstruct()
-vae.save_weight(save_path = '../result/VAE/stop/vae')
-del vae
-
-vae = VAE_trainer()
-#vae.load_weight(load_path =  '../result/VAE/flick/vae')
-vae.load('flick')
-vae.auto_train(1000, save_path = '../result/VAE/flick')
-vae.plot_z(save_path = '../result/VAE/flick/z_map.png')
-vae.reconstruct()
-vae.save_weight(save_path = '../result/VAE/flick/vae')
-del vae
+def train_VAE(key):
+    vae = VAE_trainer()
+    #vae.load_weight(load_path =  '../result/VAE/' + key + '/vae')
+    vae.load(key)
+    vae.auto_train(1000, save_path = '../result/VAE/' + key)
+    vae.plot_z(save_path = '../result/VAE/' + key + '/z_map.png')
+    vae.reconstruct(save_path = '../result/VAE/' + key + '/reconstructed')
+    vae.save_weight(save_path = '../result/VAE/' + key + '/vae')
+    del vae
 
 
+from modules.gradcam import GradCAM, GradCAMpp
+
+
+def Grad_CAM(vae, model_dict, key, pp_mode=True):
+    
+    if pp_mode:
+        gradcam = GradCAMpp(model_dict)
+    else:
+        gradcam = GradCAM(model_dict)
+    
+    src_loader = torch.utils.data.DataLoader(vae.dataset,batch_size=1,shuffle=False)
+    # test mode
+    for i, (data, label) in enumerate(src_loader):
+        pre_class, mask = gradcam(data, label)
+        data=data.detach().clone().numpy()
+        data=(data[0]-np.min(data[0]))/(np.max(data[0])-np.min(data[0]))
+        mask=mask.detach().clone().numpy()
+        
+        fig, ax = plt.subplots(3,1,figsize=(16,12))
+        ax[0].set_title('L')
+        ax[1].set_title('C')
+        ax[2].set_title('R')
+        for j in range(3):
+            ax[j].plot(range(len(mask[0])), mask[0], label='Grad_CAM')
+            ax[j].plot(range(len(data[j])), data[j], label='input_data')
+        plt.tight_layout()
+        if pp_mode:
+            plt.savefig('../result/VAE/'+key+'/Grad_CAMpp/'+vae.dataset.filenames[i].split('.csv')[0]+'.png')
+        else:
+            plt.savefig('../result/VAE/'+key+'/Grad_CAM/'+vae.dataset.filenames[i].split('.csv')[0]+'.png')
+                       
+        plt.close()
+
+
+def VAE_Grad_CAM(key):
+    vae = VAE_trainer(device='cpu')
+    vae.load_weight(load_path='../result/VAE/'+key+'/vae')
+    vae.load(key)
+    vae.model.eval()
+    model_dict = dict(arch=vae.model, layer_name=vae.model.enc_conv3)
+    Grad_CAM(vae, model_dict, key)
+    Grad_CAM(vae, model_dict, key, pp_mode=False)
+    
+    del vae
+
+
+if __name__ == "__main__":
+    #train_VAE('drive')
+    #train_VAE('block')
+    #train_VAE('push')
+    #train_VAE('stop')
+    #train_VAE('flick')
+    VAE_Grad_CAM('drive')

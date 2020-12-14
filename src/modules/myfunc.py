@@ -55,7 +55,7 @@ def ans2index_label_color_marker(answer):
                 or int(ans)+1 == 5 
                 or int(ans)+1 == 8 
                 or int(ans)+1 == 11):
-                marker.append("*")
+                marker.append(".")
             else:
                 marker.append(".")
     index.append(len(answer))
@@ -93,6 +93,5 @@ def optional_split(line, key, place):
     return first, latter
 
 
-optional_split('sub1_drive_001_1', '_', 10)
 
 

@@ -1,0 +1,81 @@
+# -*- coding: utf-8 -*-
+# ---
+# jupyter:
+#   jupytext:
+#     text_representation:
+#       extension: .py
+#       format_name: light
+#       format_version: '1.5'
+#       jupytext_version: 1.7.0
+#   kernelspec:
+#     display_name: Python 3
+#     language: python
+#     name: python3
+# ---
+
+import numpy as np
+from sklearn.preprocessing import PolynomialFeatures
+import os
+
+from modules.tournament import Swiss_System_Tournament, Player
+
+
+class Potential():
+    
+    def __init__(self):
+        self.results = []
+    
+    def load(self, path, key):
+        filenames = [temp for temp in os.listdir(path) if ('.csv' in temp and key in temp)]
+        self.key = key
+        for filename in filenames:
+            tournament = Swiss_System_Tournament()
+            tournament.Load(path + '/' + filename)
+            self.results.append(tournament)
+        self.score = np.zeros(self.results[0].participants)
+        self.calc_score()
+        
+    def calc_score(self):
+        for result in self.results:
+            for player in result.players:
+                if player.name != "Bye":
+                    id = int(player.name.split('選手')[-1]) - 1
+                    self.score[id] += player.score
+        self.score = (self.score - np.min(self.score)) / (np.max(self.score) - np.min(self.score))
+    
+    def label2score(self, Y):
+        y = Y.reshape(-1)
+        s = np.zeros_like(y)
+        for i, x in enumerate(y):
+            s[i] = self.score[int(x)]
+        S = s.reshape(Y.shape)
+        return S
+    
+    def fit(self, X, Y, dim = 2):
+        self.max = X.max(axis=0)
+        self.min = X.min(axis=0)
+        self.pf = PolynomialFeatures(dim)
+        mat_X = self.pf.fit_transform(X)
+        mat_Y = self.label2score(Y)
+        self.A = np.linalg.pinv(mat_X)@mat_Y
+        
+    def transform(self, X):
+        mat_X = X.copy()
+        if mat_X.ndim == 1:
+            mat_X = mat_X.reshape([1, -1])
+        mat_X = self.pf.fit_transform(X)
+        mat_Y = mat_X@self.A
+        Y = mat_Y.reshape([-1])
+        if len(Y) == 1:
+            return Y[0]
+        else:
+            return Y
+
+
+if __name__ == "__main__":
+    potential = Potential()
+    potential.load('../data/ranking', 'drive')
+    potential.fit(X, Y, dim=3)
+    potential.transform(X)
+
+
