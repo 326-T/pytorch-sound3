@@ -51,7 +51,7 @@ class Potential():
         S = s.reshape(Y.shape)
         return S
     
-    def fit(self, X, Y, dim = 2):
+    def fit(self, X, Y, dim = 4):
         self.max = X.max(axis=0)
         self.min = X.min(axis=0)
         self.pf = PolynomialFeatures(dim)

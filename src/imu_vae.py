@@ -136,15 +136,32 @@ class IMU_VAE_trainer():
     #def __del__(self):
     #    self.save_weight()
     
+    def load_csv(self, key):
+        self.dataset.load_csv("../data/3DM_GX3s/raw/sub2", key, 1)
+        self.dataset.load_csv("../data/3DM_GX3s/raw/sub3", key, 2)
+        self.dataset.load_csv("../data/3DM_GX3s/raw/sub4", key, 3)
+        self.dataset.load_csv("../data/3DM_GX3s/raw/sub5", key, 4)
+        self.dataset.load_csv("../data/3DM_GX3s/raw/sub6", key, 5)
+        self.dataset.load_csv("../data/3DM_GX3s/raw/sub8", key, 7)
+        self.dataset.load_csv("../data/3DM_GX3s/raw/sub9", key, 8)
+        self.dataset.load_csv("../data/3DM_GX3s/raw/sub11", key, 10)
+        self.dataset.normalize()
+        self.dataset.export_npz('../data/3DM_GX3s/raw/'+key+'.npz')
+    
+    def load_npz(self, key):
+        self.dataset.load_npz('../data/3DM_GX3s/raw/sub2/sub2_'+key+'.npz', 1)
+        self.dataset.load_npz('../data/3DM_GX3s/raw/sub3/sub3_'+key+'.npz', 2)
+        self.dataset.load_npz('../data/3DM_GX3s/raw/sub4/sub4_'+key+'.npz', 3)
+        self.dataset.load_npz('../data/3DM_GX3s/raw/sub5/sub5_'+key+'.npz', 4)
+        self.dataset.load_npz('../data/3DM_GX3s/raw/sub6/sub6_'+key+'.npz', 5)
+        self.dataset.load_npz('../data/3DM_GX3s/raw/sub8/sub8_'+key+'.npz', 7)
+        self.dataset.load_npz('../data/3DM_GX3s/raw/sub9/sub9_'+key+'.npz', 8)
+        self.dataset.load_npz('../data/3DM_GX3s/raw/sub11/sub11_'+key+'.npz', 10)
+        self.dataset.normalize()
+        self.dataset.export_npz('../data/3DM_GX3s/raw/'+key+'.npz')
+        
     def load(self, key):
-        self.dataset.load("../data/3DM_GX3s/raw/sub2", key, 1)
-        self.dataset.load("../data/3DM_GX3s/raw/sub3", key, 2)
-        self.dataset.load("../data/3DM_GX3s/raw/sub4", key, 3)
-        self.dataset.load("../data/3DM_GX3s/raw/sub5", key, 4)
-        self.dataset.load("../data/3DM_GX3s/raw/sub6", key, 5)
-        self.dataset.load("../data/3DM_GX3s/raw/sub8", key, 7)
-        self.dataset.load("../data/3DM_GX3s/raw/sub9", key, 8)
-        self.dataset.load("../data/3DM_GX3s/raw/sub11", key, 10)
+        self.dataset.load_npz('../data/3DM_GX3s/raw/'+key+'.npz')
         self.dataset.normalize()
     
     def train(self, epoch, max_epoch):
@@ -313,7 +330,7 @@ class IMU_VAE_trainer():
                    save_path.split('.png')[0] + '_ICA_each.png', z_xrange, z_yrange)
         return all_z, all_ans, ica_z.transpose()
         
-    def reconstruct(self, save_path = '../result/IMU_VAE/reconstructed_3DM_GX3s'):
+    def reconstruct(self, save_path = '../result/IMU_VAE/drive/reconstructed'):
         loader = torch.utils.data.DataLoader(self.dataset,batch_size=1,shuffle=False)
         self.model.eval()
         with torch.no_grad():
@@ -363,8 +380,7 @@ def plot_z_each(data, ans, names, sf_filepath, title, save_path, xrange=None, yr
     
     # the number of the classes == 11
     fig, ax = plt.subplots(3, 3, figsize=(24,24))
-    for i in range(0,9):
-        ax[i//3][i%3].set_title(str(i), fontsize=20)
+    ax[0][0].set_title('All', fontsize=20)
     if xrange is not None:
         for i in range(0,9):
             ax[i//3][i%3].set_xlim(xrange[0], xrange[1])
@@ -383,7 +399,8 @@ def plot_z_each(data, ans, names, sf_filepath, title, save_path, xrange=None, yr
             ax[(i+1)//3][(i+1)%3].scatter(result.success[:,0], result.success[:,1], label=label, s=20, color=color, marker='.')
         if len(result.false) > 0:
             ax[(i+1)//3][(i+1)%3].scatter(result.false[:,0], result.false[:,1], label=label, s=20, color=color, marker='x')
-        ax[(i+1)//3][(i+1)%3].legend()
+            ax[(i+1)//3][(i+1)%3].set_title('Player '+label, fontsize=20)
+        #ax[(i+1)//3][(i+1)%3].legend()
 
     plt.tight_layout()
     plt.savefig(save_path)
@@ -396,7 +413,7 @@ def train_VAE(key):
     vae.load(key)
     vae.auto_train(1000, save_path = '../result/IMU_VAE/' + key)
     vae.plot_z(save_path = '../result/IMU_VAE/' + key + '/z_map.png')
-    vae.reconstruct()
+    vae.reconstruct(save_path = '../result/IMU_VAE/' + key + '/reconstructed')
     vae.save_weight(save_path = '../result/IMU_VAE/' + key + '/vae')
     del vae
 
@@ -446,17 +463,26 @@ def IMU_VAE_Grad_CAM(key):
     del vae
 
 
-if __name__ == "__main__":
-    #train_VAE('drive')
-    #train_VAE('block')
-    #train_VAE('push')
-    #train_VAE('stop')
-    #train_VAE('flick')
-    #IMU_VAE_Grad_CAM('drive')
+def train_all():
+    train_VAE('drive')
+    train_VAE('block')
+    train_VAE('push')
+    train_VAE('stop')
+    train_VAE('flick')
+
+
+def Grad_CAM_all():
+    IMU_VAE_Grad_CAM('drive')
     IMU_VAE_Grad_CAM('block')
     IMU_VAE_Grad_CAM('push')
     IMU_VAE_Grad_CAM('stop')
     IMU_VAE_Grad_CAM('flick')
+
+
+if __name__ == "__main__":
+    Grad_CAM_all()
+
+
 
 
 

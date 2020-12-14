@@ -25,16 +25,19 @@ from modules.myfunc import ans2index_label_color_marker
 
 class Potential_Map():
     
-    def __init__(self, model, tech):
+    def __init__(self, model, tech, dim=4):
         self.model_type = model
         self.tech = tech
         self.potential = Potential()
         self.potential.load('../data/ranking', tech)
-        self.vae = IMU_VAE_trainer()
+        if self.model_type == "VAE":
+            self.vae = VAE_trainer()
+        elif self.model_type == "IMU_VAE":
+            self.vae = IMU_VAE_trainer()
         self.vae.load_weight(load_path =  '../result/' + self.model_type + '/' + self.tech + '/vae')
         self.vae.load(tech)
         _, self.Y, self.X = self.vae.plot_z(save_path = '../result/' + self.model_type + '/' + self.tech + '/z_map.png')
-        self.potential.fit(self.X, self.Y, dim=4)
+        self.potential.fit(self.X, self.Y, dim)
     
     def plot(self):
         fig = plt.figure(figsize=(20,12))
@@ -64,19 +67,23 @@ class Potential_Map():
         ani.save('../result/' + self.model_type + '/' + self.tech + '/potential.mp4', writer="ffmpeg", dpi=100)
 
 
-def plot_potential(model, tech):
-    pmap = Potential_Map(model, tech)
+def plot_potential(model, tech, dim=4):
+    pmap = Potential_Map(model, tech, dim)
     pmap.plot()
     del pmap
 
 
+def plot_all(models, keys):
+    for model in models:
+        for key in keys:
+            plot_potential(model, key)
+
+
 if __name__ == "__main__":
-    plot_potential('IMU_VAE', 'drive')
-    plot_potential('IMU_VAE', 'block')
-    plot_potential('IMU_VAE', 'push')
-    plot_potential('IMU_VAE', 'stop')
-    plot_potential('IMU_VAE', 'flick')
-    
+    models = ['IMU_VAE', 'VAE']
+    keys = ['drive', 'block', 'push', 'stop', 'flick']
+    plot_all(models, keys, 4)    
+
 
 
 

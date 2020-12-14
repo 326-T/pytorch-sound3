@@ -54,11 +54,11 @@ class Generalization_Performance():
             vae = IMU_VAE_trainer()
         for i, (path, score) in enumerate(zip(self.all_path, self.score)):
             if i != exception:
-                vae.dataset.load(path, self.key, score)
+                vae.dataset.load_npz(path, self.key, score)
         vae.dataset.normalize()
         vae.auto_train(100)
         vae.dataset.clear()
-        vae.dataset.load(self.all_path[exception], self.key, self.score[exception])
+        vae.dataset.load_npz(self.all_path[exception], self.key, self.score[exception])
         vae.dataset.normalize()
         vae.valid_loader = torch.utils.data.DataLoader(vae.dataset, batch_size=len(vae.dataset), shuffle=False)
         v_loss, v_loss_vae, v_loss_classifier, v_acc = vae.valid(1)
@@ -108,6 +108,8 @@ def IMU_all():
 
 
 if __name__ == "__main__":
+    model = ['IMU_VAE', 'VAE']
+    key = ['drive', 'block', 'push', 'stop', 'flick']
     IMU_all()
 
 

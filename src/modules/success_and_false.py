@@ -49,7 +49,7 @@ class result():
     def classify(self, sheet):
         for i, name in enumerate(self.names):
             row, col = optional_split(name.split('.csv')[0], '_', -1)
-            if sheet.at[row,col] is '2':
+            if sheet.at[row,col] == '2':
                 self.false.append(self.data[i])
             elif sheet.isnull().at[row,col]:
                 self.success.append(self.data[i])

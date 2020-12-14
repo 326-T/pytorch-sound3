@@ -49,9 +49,9 @@ class VAE(nn.Module):
         #self.encoder.add_module('enc_relu2', nn.ReLU(True))
         #self.encoder.add_module('enc_conv3', nn.Conv1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=6, padding_mode='zeros'))
         #self.encoder.add_module('enc_relu3', nn.ReLU(True))
-        self.enc_conv1 = nn.Conv1d(in_channels=3, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros')
-        self.enc_conv2 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros')
-        self.enc_conv3 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros')
+        self.enc_conv1 = nn.Conv1d(in_channels=3, out_channels=9, kernel_size=16, stride=10, padding=3, padding_mode='zeros')
+        self.enc_conv2 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=3, padding_mode='zeros')
+        self.enc_conv3 = nn.Conv1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=3, padding_mode='zeros')
         # z to mean
         self.encmean_fc11 = nn.Linear(int(input_shape/10/10/10*9), z_shape)
         # z to var
@@ -61,13 +61,13 @@ class VAE(nn.Module):
         self.dec_fc1 = nn.Linear(z_shape, int(input_shape/10/10/10*9))
         self.decoder = nn.Sequential()
         self.decoder.add_module('dec_deconv1', 
-                                nn.ConvTranspose1d(in_channels=9, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros'))
+                                nn.ConvTranspose1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=3, padding_mode='zeros'))
         self.decoder.add_module('dec_relu1', nn.ReLU(True))
         self.decoder.add_module('dec_deconv2', 
-                                nn.ConvTranspose1d(in_channels=9, out_channels=9, kernel_size=20, stride=10, padding=5, padding_mode='zeros'))
+                                nn.ConvTranspose1d(in_channels=9, out_channels=9, kernel_size=16, stride=10, padding=3, padding_mode='zeros'))
         self.decoder.add_module('dec_relu2', nn.ReLU(True))
         self.decoder.add_module('dec_deconv3', 
-                                nn.ConvTranspose1d(in_channels=9, out_channels=3, kernel_size=20, stride=10, padding=5, padding_mode='zeros'))
+                                nn.ConvTranspose1d(in_channels=9, out_channels=3, kernel_size=16, stride=10, padding=3, padding_mode='zeros'))
         self.decoder.add_module('dec_sig1', nn.Sigmoid())
         
         # estimator
@@ -123,7 +123,7 @@ class VAE(nn.Module):
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
         return BCE + KLD * beta
     def loss_function_classifier(self, pre_y, y):
-        return F.cross_entropy(pre_y, y)*self.input_shape*3
+        return F.cross_entropy(pre_y, y)*self.input_shape
     
     def acc(self, pre_tar, tar):
         _, p_tar = torch.max(pre_tar, 1)
@@ -147,18 +147,38 @@ class VAE_trainer():
     #def __del__(self):
     #    self.save_weight()
     
+    def load_csv(self, key):
+        self.dataset.load_csv("../data/sounds/raw/sub1", key, 0)
+        self.dataset.load_csv("../data/sounds/raw/sub2", key, 1)
+        self.dataset.load_csv("../data/sounds/raw/sub3", key, 2)
+        self.dataset.load_csv("../data/sounds/raw/sub4", key, 3)
+        self.dataset.load_csv("../data/sounds/raw/sub5", key, 4)
+        self.dataset.load_csv("../data/sounds/raw/sub6", key, 5)
+        self.dataset.load_csv("../data/sounds/raw/sub7", key, 6)
+        self.dataset.load_csv("../data/sounds/raw/sub8", key, 7)
+        self.dataset.load_csv("../data/sounds/raw/sub9", key, 8)
+        self.dataset.load_csv("../data/sounds/raw/sub10", key, 9)
+        self.dataset.load_csv("../data/sounds/raw/sub11", key, 10)
+        self.dataset.normalize()
+        self.dataset.export_npz('../data/sounds/raw/'+key+'.npz')
+    
+    def load_npz(self, key):
+        self.dataset.load_npz('../data/sounds/raw/sub1/sub1_'+key+'.npz', 0)
+        self.dataset.load_npz('../data/sounds/raw/sub2/sub2_'+key+'.npz', 1)
+        self.dataset.load_npz('../data/sounds/raw/sub3/sub3_'+key+'.npz', 2)
+        self.dataset.load_npz('../data/sounds/raw/sub4/sub4_'+key+'.npz', 3)
+        self.dataset.load_npz('../data/sounds/raw/sub5/sub5_'+key+'.npz', 4)
+        self.dataset.load_npz('../data/sounds/raw/sub6/sub6_'+key+'.npz', 5)
+        self.dataset.load_npz('../data/sounds/raw/sub7/sub7_'+key+'.npz', 6)
+        self.dataset.load_npz('../data/sounds/raw/sub8/sub8_'+key+'.npz', 7)
+        self.dataset.load_npz('../data/sounds/raw/sub9/sub9_'+key+'.npz', 8)
+        self.dataset.load_npz('../data/sounds/raw/sub10/sub10_'+key+'.npz', 9)
+        self.dataset.load_npz('../data/sounds/raw/sub11/sub11_'+key+'.npz', 10)
+        self.dataset.normalize()
+        self.dataset.export_npz('../data/sounds/raw/'+key+'.npz')
+        
     def load(self, key):
-        self.dataset.load("../data/sounds/raw/sub1", key, 0)
-        self.dataset.load("../data/sounds/raw/sub2", key, 1)
-        self.dataset.load("../data/sounds/raw/sub3", key, 2)
-        self.dataset.load("../data/sounds/raw/sub4", key, 3)
-        self.dataset.load("../data/sounds/raw/sub5", key, 4)
-        self.dataset.load("../data/sounds/raw/sub6", key, 5)
-        self.dataset.load("../data/sounds/raw/sub7", key, 6)
-        self.dataset.load("../data/sounds/raw/sub8", key, 7)
-        self.dataset.load("../data/sounds/raw/sub9", key, 8)
-        self.dataset.load("../data/sounds/raw/sub10", key, 9)
-        self.dataset.load("../data/sounds/raw/sub11", key, 10)
+        self.dataset.load_npz('../data/sounds/raw/'+key+'.npz')
         self.dataset.normalize()
     
     def train(self, epoch, max_epoch):
@@ -382,8 +402,7 @@ def plot_z_each(data, ans, names, sf_filepath, title, save_path, xrange=None, yr
     
     # the number of the classes == 11
     fig, ax = plt.subplots(4, 3, figsize=(24,32))
-    for i in range(0,12):
-        ax[i//3][i%3].set_title(str(i), fontsize=20)
+    ax[0][0].set_title('All', fontsize=20)
     if xrange is not None:
         for i in range(0,12):
             ax[i//3][i%3].set_xlim(xrange[0], xrange[1])
@@ -402,8 +421,7 @@ def plot_z_each(data, ans, names, sf_filepath, title, save_path, xrange=None, yr
             ax[(i+1)//3][(i+1)%3].scatter(result.success[:,0], result.success[:,1], label=label, s=20, color=color, marker='.')
         if len(result.false) > 0:
             ax[(i+1)//3][(i+1)%3].scatter(result.false[:,0], result.false[:,1], label=label, s=20, color=color, marker='x')
-        ax[(i+1)//3][(i+1)%3].legend()
-
+        ax[(i+1)//3][(i+1)%3].set_title('Player '+label)
     plt.tight_layout()
     plt.savefig(save_path)
     plt.close()
@@ -412,8 +430,8 @@ def plot_z_each(data, ans, names, sf_filepath, title, save_path, xrange=None, yr
 def train_VAE(key):
     vae = VAE_trainer()
     #vae.load_weight(load_path =  '../result/VAE/' + key + '/vae')
-    vae.load(key)
-    vae.auto_train(1000, save_path = '../result/VAE/' + key)
+    vae.load_npz(key)
+    vae.auto_train(10, save_path = '../result/VAE/' + key)
     vae.plot_z(save_path = '../result/VAE/' + key + '/z_map.png')
     vae.reconstruct(save_path = '../result/VAE/' + key + '/reconstructed')
     vae.save_weight(save_path = '../result/VAE/' + key + '/vae')
@@ -466,10 +484,21 @@ def VAE_Grad_CAM(key):
     del vae
 
 
-if __name__ == "__main__":
-    #train_VAE('drive')
-    #train_VAE('block')
-    #train_VAE('push')
-    #train_VAE('stop')
-    #train_VAE('flick')
+def train_all():
+    train_VAE('drive')
+    train_VAE('block')
+    train_VAE('push')
+    train_VAE('stop')
+    train_VAE('flick')
+
+
+def Grad_CAM_all():
     VAE_Grad_CAM('drive')
+    VAE_Grad_CAM('block')    
+    VAE_Grad_CAM('push')    
+    VAE_Grad_CAM('stop')    
+    VAE_Grad_CAM('flick')    
+
+
+if __name__ == "__main__":
+    train_all()
