@@ -34,13 +34,12 @@ from modules.success_and_false import result, results_list
 
 
 class VAE(nn.Module):
-    def __init__(self,input_shape,z_shape=20,output_shape=11,beta=10):
+    def __init__(self,input_shape,z_shape=20,output_shape=1):
         super(VAE, self).__init__()
         
         self.input_shape = input_shape
         self.z_shape = z_shape
         self.output_shape = output_shape
-        self.beta = beta
         
         # encoder
         #self.encoder = nn.Sequential()
@@ -119,12 +118,13 @@ class VAE(nn.Module):
         
         return pre_x, y, mu, logvar
     
-    def loss_function_vae(self, rec_x, x, mu, logvar):
+    def loss_function_vae(self, rec_x, x, mu, logvar, beta=2):
         BCE = F.binary_cross_entropy(rec_x, x.float(), reduction='sum')
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-        return BCE + KLD * self.beta
+        return BCE + KLD * beta
+    
     def loss_function_classifier(self, pre_y, y):
-        return F.cross_entropy(pre_y, y)*self.input_shape
+        return F.mse_loss(pre_y, y.float())*self.input_shape
     
     def acc(self, pre_tar, tar):
         _, p_tar = torch.max(pre_tar, 1)
@@ -133,14 +133,14 @@ class VAE(nn.Module):
 
 
 class VAE_trainer():
-    def __init__(self, dim_z = 20, device="cuda", beta = 2):
+    def __init__(self, dim_z = 20, device="cuda"):
         # prepare cuda device
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         #self.device = torch.device("cpu")
         # prepare dataset
-        self.dataset = SoundDataset(transform=transforms.ToTensor())
+        self.dataset = SoundDataset(transform=transforms.ToTensor(), mode='score')
         # define model
-        self.model = VAE(self.dataset.data_size, dim_z, beta).to(self.device)
+        self.model = VAE(self.dataset.data_size, dim_z).to(self.device)
         # define optimizer
         self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
         self.dim_z = dim_z
@@ -267,14 +267,14 @@ class VAE_trainer():
             plt.savefig(save_path+'/loss.png')
             plt.close()
         
-    def save_weight(self, save_path = '../result/VAE/model/vae'):
+    def save_weight(self, save_path = '../result/VAE-score/model/vae'):
         torch.save(self.model.state_dict(), save_path)
         
-    def load_weight(self, load_path = '../result/VAE/model/vae'):
+    def load_weight(self, load_path = '../result/VAE-score/model/vae'):
         self.model.load_state_dict(torch.load(load_path))
     
     
-    def plot_z(self, save_path='../result/VAE/model/result.png'):
+    def plot_z(self, save_path='../result/VAE-score/model/result.png'):
         # print z all data
         loader = torch.utils.data.DataLoader(self.dataset,batch_size=len(self.dataset),shuffle=False)
         all_z = []
@@ -285,22 +285,21 @@ class VAE_trainer():
                 data = data.to(self.device)
                 _, _, mu, logvar = self.model.forward(data)
                 all_z = np.append(all_z, mu.to('cpu').clone().numpy())
-                all_ans = np.append(all_ans, ans.to('cpu').clone().numpy())
 
         all_z = np.array(all_z).reshape(-1, self.model.z_shape)
-        all_ans = np.array(all_ans).reshape(-1)
+        all_ans = self.dataset.ans
         
         # LDA
-        self.lda = LDA(n_components = 2)
-        self.lda.fit(all_z, all_ans)
-        lda_z = self.lda.transform(all_z)
-        lda_z = lda_z.transpose()
+        #self.lda = LDA(n_components = 2)
+        #self.lda.fit(all_z, all_ans)
+        #lda_z = self.lda.transform(all_z)
+        #lda_z = lda_z.transpose()
         
-        z_xrange = [np.min(lda_z[0]), np.max(lda_z[0])]
-        z_yrange = [np.min(lda_z[1]), np.max(lda_z[1])]        
-        plot_z(lda_z[0], lda_z[1], all_ans, "z map", save_path.split('.png')[0] + '_LDA.png', z_xrange, z_yrange)
-        plot_z_each(lda_z, all_ans, self.dataset.filenames, '../data/succeed_list_sound.csv', "z map",
-                   save_path.split('.png')[0] + '_LDA_each.png', z_xrange, z_yrange)
+        #z_xrange = [np.min(lda_z[0]), np.max(lda_z[0])]
+        #z_yrange = [np.min(lda_z[1]), np.max(lda_z[1])]        
+        #plot_z(lda_z[0], lda_z[1], all_ans, "z map", save_path.split('.png')[0] + '_LDA.png', z_xrange, z_yrange)
+        #plot_z_each(lda_z, all_ans, self.dataset.filenames, '../data/succeed_list_sound.csv', "z map",
+        #           save_path.split('.png')[0] + '_LDA_each.png', z_xrange, z_yrange)
         
         # ICA
         self.ica = FastICA(n_components = 2)
@@ -315,7 +314,7 @@ class VAE_trainer():
                    save_path.split('.png')[0] + '_ICA_each.png', z_xrange, z_yrange)
         return all_z, all_ans, ica_z.transpose()
         
-    def reconstruct(self, save_path = '../result/VAE/reconstructed_sounds'):
+    def reconstruct(self, save_path = '../result/VAE-score/reconstructed_sounds'):
         loader = torch.utils.data.DataLoader(self.dataset,batch_size=1,shuffle=False)
         self.model.eval()
         with torch.no_grad():
@@ -399,10 +398,10 @@ def train_VAE(key):
     vae = VAE_trainer()
     #vae.load_weight(load_path =  '../result/VAE/' + key + '/vae')
     vae.load(key)
-    vae.auto_train(1000, save_path = '../result/VAE/' + key)
-    vae.plot_z(save_path = '../result/VAE/' + key + '/z_map.png')
-    vae.reconstruct(save_path = '../result/VAE/' + key + '/reconstructed')
-    vae.save_weight(save_path = '../result/VAE/' + key + '/vae')
+    vae.auto_train(1000, save_path = '../result/VAE-score/' + key)
+    vae.plot_z(save_path = '../result/VAE-score/' + key + '/z_map.png')
+    vae.reconstruct(save_path = '../result/VAE-score/' + key + '/reconstructed')
+    vae.save_weight(save_path = '../result/VAE-score/' + key + '/vae')
     del vae
 
 
@@ -433,16 +432,16 @@ def Grad_CAM(vae, model_dict, key, pp_mode=True):
             ax[j].plot(range(len(data[j])), data[j], label='input_data')
         plt.tight_layout()
         if pp_mode:
-            plt.savefig('../result/VAE/'+key+'/Grad_CAMpp/'+vae.dataset.filenames[i].split('.csv')[0]+'.png')
+            plt.savefig('../result/VAE-score/'+key+'/Grad_CAMpp/'+vae.dataset.filenames[i].split('.csv')[0]+'.png')
         else:
-            plt.savefig('../result/VAE/'+key+'/Grad_CAM/'+vae.dataset.filenames[i].split('.csv')[0]+'.png')
+            plt.savefig('../result/VAE-score/'+key+'/Grad_CAM/'+vae.dataset.filenames[i].split('.csv')[0]+'.png')
                        
         plt.close()
 
 
 def VAE_Grad_CAM(key):
     vae = VAE_trainer(device='cpu')
-    vae.load_weight(load_path='../result/VAE/'+key+'/vae')
+    vae.load_weight(load_path='../result/VAE-score/'+key+'/vae')
     vae.load(key)
     vae.model.eval()
     model_dict = dict(arch=vae.model, layer_name=vae.model.enc_conv3)
@@ -456,6 +455,5 @@ if __name__ == "__main__":
     keys = ['drive' ,'block', 'push', 'stop', 'flick']
     for key in keys:
         train_VAE(key)
-
-
+        #VAE_Grad_CAM(key)
 

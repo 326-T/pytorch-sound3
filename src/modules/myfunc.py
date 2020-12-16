@@ -91,7 +91,3 @@ def optional_split(line, key, place):
             latter += key + temp[i]
 
     return first, latter
-
-
-
-

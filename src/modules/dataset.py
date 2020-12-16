@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # ---
 # jupyter:
 #   jupytext:
@@ -19,15 +20,37 @@ import torch
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+from modules.tournament import Swiss_System_Tournament, Player
 
-class SoundDataset(Dataset):
+
+class MyDataset(Dataset):
     
-    def __init__(self, dim=11, data_size = 20000, transform = None):
-        self.transform = transform
+    def __init__(self, dim=11, data_size = 20000, transform = None, mode = 'label'):
+        self.dim = dim
         self.data_size = data_size
+        self.transform = transform
+        self.mode = mode
         self.data_num = 0
         self.init_flag = True
-        self.dim = dim
+        self.results = []
+            
+    def load_score(self, path, key):
+        filenames = [temp for temp in os.listdir(path) if ('.csv' in temp and key in temp)]
+        self.key = key
+        for filename in filenames:
+            tournament = Swiss_System_Tournament()
+            tournament.Load(path + '/' + filename)
+            self.results.append(tournament)
+        self.score = np.zeros(self.results[0].participants)
+        self.calc_score()
+        
+    def calc_score(self):
+        for result in self.results:
+            for player in result.players:
+                if player.name != "Bye":
+                    id = int(player.name.split('選手')[-1]) - 1
+                    self.score[id] += player.score
+        self.score = (self.score - np.min(self.score)) / (np.max(self.score) - np.min(self.score))
             
     def load_csv(self, data_path, key, label):
         all_filenames = [temp for temp in os.listdir(data_path) if ('.csv' in temp and key in temp)]
@@ -45,16 +68,19 @@ class SoundDataset(Dataset):
                 print(filename)
         data = np.array(data)
         ans = np.full(len(data),label)
+        score = np.full(len(data), self.score[int(data_path.split('/sub')[-1])-1])
         
         if(self.init_flag):
             self.filenames = filenames
             self.data = data
             self.ans = ans
+            self.score = score
             self.init_flag = False
         else:
             self.filenames = self.filenames + filenames
             self.data = np.concatenate([self.data, data])
             self.ans = np.concatenate([self.ans, ans])
+            self.score = np.concatenate([self.score, score])
         
     def normalize(self):
         self.data_max = np.max(self.data)
@@ -64,123 +90,62 @@ class SoundDataset(Dataset):
     
     def clear(self):
         self.filenames.clear()
+        self.results.clear()
         self.init_flag = True
         self.data_num = 0
     
     def export_npz(self, save_path):
-        np.savez(save_path, data = self.data, ans = self.ans, filenames = np.array(self.filenames))
+        np.savez(save_path, data = self.data, ans = self.ans, score = self.score, filenames = np.array(self.filenames))
         
-    def load_npz(self, load_path, label=None):
+    def load_npz(self, load_path, ans=None, score=None):
         npz = np.load(load_path, allow_pickle=True)
         data = npz['data']
         filenames = npz['filenames'].tolist()
-        if label is not None:
-            ans = np.full(len(data), int(label))
+        if ans is not None:
+            ans = np.full(len(data), ans)
         else:
-            ans = npz['ans'].tolist()
+            ans = npz['ans']
+        if score is not None:
+            score = np.full(len(data), score)
+        else:
+            #score = np.full(len(data), self.score[int(load_path.split('/sub')[-1].split('_')[0])-1])
+            score = npz['score']
         
         if(self.init_flag):
             self.filenames = filenames
             self.data = data
             self.ans = ans
+            self.score = score
             self.init_flag = False
         else:
             self.filenames += filenames
             self.data = np.concatenate([self.data, data])
             self.ans = np.concatenate([self.ans, ans])
+            self.score = np.concatenate([self.score, score])
 
     def __len__(self):
         return self.data_num
     
     def __getitem__(self, idx):
         out_data = self.data[idx]
-        out_ans = self.ans[idx]
-        return out_data, out_ans
+        if self.mode == 'label':
+            out = self.ans[idx]
+        elif self.mode == 'score':
+            out = self.score[idx]
+        return out_data, out
 
 
-class IMUDataset(Dataset):
+class SoundDataset(MyDataset):
     
+    def __init__(self, dim=11, data_size = 20000, transform = None, mode = 'label'):
+        super().__init__(dim, data_size, transform, mode)
+
+
+class IMUDataset(MyDataset):
     
-    def __init__(self, dim=11, data_size = 100, transform = None):
-        self.transform = transform
-        self.data_size = data_size
-        self.data_num = 0
-        self.init_flag = True
-        self.dim = dim
-            
-    def load_csv(self, data_path, key, label):
-        all_filenames = [temp for temp in os.listdir(data_path) if ('.csv' in temp and key in temp)]
-        all_filenames.sort()
-        data = []
-        filenames = []
-        for filename in all_filenames:
-            x = pd.read_csv(data_path+'/'+filename, index_col = 0)
-            if(self.init_flag):
-                self.columns = x.columns.values
-            x.iloc[:,:].astype('float')
-            x = x.values.transpose()
-            if x.shape[1] >= self.data_size:
-                data.append(x[1:,int(x.shape[1]/2-self.data_size/2):int(x.shape[1]/2+self.data_size/2)])
-                filenames.append(filename)
-            else:
-                print(filename)
-        data = np.array(data)
-        ans = np.full(len(data),label)
-        
-        if(self.init_flag):
-            if data.shape[0] > 0:
-                self.filenames = filenames
-                self.data = data
-                self.ans = ans
-                self.init_flag = False
-        else:
-            if data.shape[0] > 0:
-                self.filenames += filenames
-                self.data = np.concatenate([self.data, data])
-                self.ans = np.concatenate([self.ans, ans])
-        
-    def normalize(self):
-        self.data_max = np.max(self.data)
-        self.data_min = np.min(self.data)
-        self.data = (self.data - self.data_min) / (self.data_max - self.data_min)
-        self.data_num = len(self.data)
-        
-    def clear(self):
-        self.filenames.clear()
-        self.init_flag = True
-        self.data_num = 0    
-    
-    def export_npz(self, save_path):
-        np.savez(save_path, data = self.data, ans = self.ans,
-                 filenames = np.array(self.filenames), columns = self.columns)
-        
-    def load_npz(self, load_path, label=None):
-        npz = np.load(load_path, allow_pickle=True)
-        data = npz['data']
-        filenames = npz['filenames'].tolist()
-        if label is not None:
-            ans = np.full(len(data), int(label))
-        else:
-            ans = npz['ans'].tolist()
-        
-        if(self.init_flag):
-            self.filenames = filenames
-            self.data = data
-            self.ans = ans
-            self.columns = npz['columns']
-            self.init_flag = False
-        else:
-            self.filenames = self.filenames + filenames
-            self.data = np.concatenate([self.data, data])
-            self.ans = np.concatenate([self.ans, ans])
-    
-    def __len__(self):
-        return self.data_num
-    
-    def __getitem__(self, idx):
-        out_data = self.data[idx]
-        out_ans = self.ans[idx]
-        return out_data, out_ans
+    def __init__(self, dim=11, data_size = 100, transform = None, mode = 'label'):
+        super().__init__(dim, data_size, transform, mode)
+        self.columns = ['Pitch Y', 'Roll X', 'Heading Z', 'Acc X', 'Acc Y', 'Acc Z', 'AR X', 'AR Y', 'AR Z']
 
 
 def csv2npz_all():
@@ -205,8 +170,49 @@ def csv2npz_all():
                 csv2npz(model, name, key, 0)
 
 
+def add_score_all():
+    def add_score(model, name, key, label):
+        if model == '3DM_GX3s':
+            if name == 'sub1' or name == 'sub7' or name == 'sub10':
+                return 1
+            dataset = IMUDataset()
+        elif model == 'sounds':
+            dataset = SoundDataset()
+        dataset.load_score('../../data/ranking', key)
+        dataset.load_npz('../../data/'+model+'/raw/'+name+'/'+name+'_'+key+'.npz', ans=label)
+        dataset.export_npz('../../data/'+model+'/raw/'+name+'/'+name+'_'+key+'.npz')
+        del dataset
+    
+    def merge_npz(model, key, names):
+        if model == '3DM_GX3s':
+            dataset = IMUDataset()
+        elif model == 'sounds':
+            dataset = SoundDataset()
+        for name in names:
+            if not (model == '3DM_GX3s' and (name == 'sub1' or name == 'sub7' or name == 'sub10')):
+                dataset.load_npz('../../data/'+model+'/raw/'+name+'/'+name+'_'+key+'.npz')
+        dataset.normalize()
+        dataset.export_npz('../../data/'+model+'/raw/'+key+'.npz')
+        del dataset
+
+    models = ['3DM_GX3s']
+    names = ['sub1', 'sub2', 'sub3', 'sub4', 'sub5', 'sub6', 'sub7', 'sub8', 'sub9', 'sub10', 'sub11']
+    keys = ['drive', 'block', 'push', 'stop', 'flick']
+    for model in models:
+        for key in keys:
+            for name in names:
+                add_score(model, name, key, int(name.split('sub')[-1]))
+            merge_npz(model, key, names)
+
+
 if __name__ == "__main__":
-    csv2npz_all()
+    add_score_all()
+
+
+
+
+
+
 
 
 

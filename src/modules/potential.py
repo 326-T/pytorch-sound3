@@ -18,6 +18,7 @@ from sklearn.preprocessing import PolynomialFeatures
 import os
 
 from modules.tournament import Swiss_System_Tournament, Player
+from modules.myfunc import ans2index_label_color_marker
 
 
 class Potential():
@@ -50,6 +51,9 @@ class Potential():
             s[i] = self.score[int(x)]
         S = s.reshape(Y.shape)
         return S
+
+
+class MRA_Potential(Potential):
     
     def fit(self, X, Y, dim = 4):
         self.max = X.max(axis=0)
@@ -70,6 +74,41 @@ class Potential():
             return Y[0]
         else:
             return Y
+
+
+class GMM_Potential(Potential):
+    
+    def fit(self, X, Y, dim = 0): # dim is dummy
+        idxs, _, _, _, = ans2index_label_color_marker(Y)
+        self.gauss = []
+        for i in range(len(idxs)-1):
+            gauss.append(MultiDimGauss(X[idxs[i]:idxs[i+1]], label2score(Y[idxs[i]])))
+            
+    def transform(self, X):
+        Y = np.zeros(len(X), dtype=float)
+        for i, x in enumerate(X):
+            for gauss in self.gauss:
+                Y[i] += gauss.calc(x)
+        if len(Y) == 1:
+            return Y[0]
+        else:
+            return Y
+        
+
+
+class MultiDimGauss():
+    
+    def __init__(self, X, k=1):
+        self.Mean = np.matrix(np.mean(X, axis=1))
+        self.Sigma = np.cov(X.T)
+        self.k = k
+    
+    def calc(self, _X):
+        X = np.matrix(_X)
+        a = np.sqrt(np.linalg.det(self.Sigma)*(2*np.pi)**self.Sigma.ndim)
+        b = np.linalg.det(-0.5*(X - self.Mean)*Self.Sigma.I*(X - self.Mean).T)
+        return self.k*np.exp(b)/a
+        
 
 
 if __name__ == "__main__":

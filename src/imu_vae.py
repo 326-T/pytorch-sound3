@@ -35,12 +35,13 @@ from modules.success_and_false import result, results_list
 
 
 class IMU_VAE(nn.Module):
-    def __init__(self,input_shape,z_shape=10,output_shape=11):
+    def __init__(self,input_shape,z_shape=10,output_shape=11,beta=10):
         super(IMU_VAE, self).__init__()
         
         self.input_shape = input_shape
         self.z_shape = z_shape
         self.output_shape = output_shape
+        self.beta = beta
         
         # encoder
         #self.encoder = nn.Sequential()
@@ -107,10 +108,10 @@ class IMU_VAE(nn.Module):
         
         return pre_x, y, mu, logvar
     
-    def loss_function_vae(self, rec_x, x, mu, logvar, beta=1):
+    def loss_function_vae(self, rec_x, x, mu, logvar):
         BCE = F.binary_cross_entropy(rec_x, x.float(), reduction='sum')
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-        return BCE + KLD * beta
+        return BCE + KLD * self.beta
     def loss_function_classifier(self, pre_y, y):
         return F.cross_entropy(pre_y, y)*self.input_shape*9
     
@@ -121,45 +122,18 @@ class IMU_VAE(nn.Module):
 
 
 class IMU_VAE_trainer():
-    def __init__(self, dim_z = 10, device="cuda"):
+    def __init__(self, dim_z = 10, device="cuda" ,beta=2):
         # prepare cuda device
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         #self.device = torch.device("cpu")
         # prepare dataset
         self.dataset = IMUDataset(transform=transforms.ToTensor())
         # define model
-        self.model = IMU_VAE(self.dataset.data_size, dim_z).to(self.device)
+        self.model = IMU_VAE(self.dataset.data_size, dim_z, beta).to(self.device)
         # define optimizer
         self.optimizer = optim.Adam(self.model.parameters(), lr=1e-3)
         self.dim_z = dim_z
     
-    #def __del__(self):
-    #    self.save_weight()
-    
-    def load_csv(self, key):
-        self.dataset.load_csv("../data/3DM_GX3s/raw/sub2", key, 1)
-        self.dataset.load_csv("../data/3DM_GX3s/raw/sub3", key, 2)
-        self.dataset.load_csv("../data/3DM_GX3s/raw/sub4", key, 3)
-        self.dataset.load_csv("../data/3DM_GX3s/raw/sub5", key, 4)
-        self.dataset.load_csv("../data/3DM_GX3s/raw/sub6", key, 5)
-        self.dataset.load_csv("../data/3DM_GX3s/raw/sub8", key, 7)
-        self.dataset.load_csv("../data/3DM_GX3s/raw/sub9", key, 8)
-        self.dataset.load_csv("../data/3DM_GX3s/raw/sub11", key, 10)
-        self.dataset.normalize()
-        self.dataset.export_npz('../data/3DM_GX3s/raw/'+key+'.npz')
-    
-    def load_npz(self, key):
-        self.dataset.load_npz('../data/3DM_GX3s/raw/sub2/sub2_'+key+'.npz', 1)
-        self.dataset.load_npz('../data/3DM_GX3s/raw/sub3/sub3_'+key+'.npz', 2)
-        self.dataset.load_npz('../data/3DM_GX3s/raw/sub4/sub4_'+key+'.npz', 3)
-        self.dataset.load_npz('../data/3DM_GX3s/raw/sub5/sub5_'+key+'.npz', 4)
-        self.dataset.load_npz('../data/3DM_GX3s/raw/sub6/sub6_'+key+'.npz', 5)
-        self.dataset.load_npz('../data/3DM_GX3s/raw/sub8/sub8_'+key+'.npz', 7)
-        self.dataset.load_npz('../data/3DM_GX3s/raw/sub9/sub9_'+key+'.npz', 8)
-        self.dataset.load_npz('../data/3DM_GX3s/raw/sub11/sub11_'+key+'.npz', 10)
-        self.dataset.normalize()
-        self.dataset.export_npz('../data/3DM_GX3s/raw/'+key+'.npz')
-        
     def load(self, key):
         self.dataset.load_npz('../data/3DM_GX3s/raw/'+key+'.npz')
         self.dataset.normalize()
@@ -190,7 +164,7 @@ class IMU_VAE_trainer():
             train_loss_vae += loss_vae.item()
             train_loss_classifier += loss_classifier.item()
             train_acc += self.model.acc(pre_y, y)
-            if batch_idx % 1 == 0:
+            if batch_idx % 20 == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch, batch_idx * len(x), len(self.train_loader.dataset),
                     100. * batch_idx / len(self.train_loader),
@@ -463,24 +437,23 @@ def IMU_VAE_Grad_CAM(key):
     del vae
 
 
-def train_all():
-    train_VAE('drive')
-    train_VAE('block')
-    train_VAE('push')
-    train_VAE('stop')
-    train_VAE('flick')
-
-
-def Grad_CAM_all():
-    IMU_VAE_Grad_CAM('drive')
-    IMU_VAE_Grad_CAM('block')
-    IMU_VAE_Grad_CAM('push')
-    IMU_VAE_Grad_CAM('stop')
-    IMU_VAE_Grad_CAM('flick')
-
-
 if __name__ == "__main__":
-    Grad_CAM_all()
+    keys = ['drive', 'block', 'push', 'stop', 'flick']
+    for key in keys:
+        train_VAE(key)
+        #IMU_VAE_Grad_CAM('drive')
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

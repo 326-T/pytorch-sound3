@@ -27,19 +27,21 @@ class Generalization_Performance():
     def __init__(self, model_type, key):
         self.model_type = model_type
         self.key = key
-        self.all_path = ["../data/sounds/raw/sub1", "../data/sounds/raw/sub2", "../data/sounds/raw/sub3", "../data/sounds/raw/sub4",
-                         "../data/sounds/raw/sub5", "../data/sounds/raw/sub6", "../data/sounds/raw/sub7", "../data/sounds/raw/sub8",
-                         "../data/sounds/raw/sub9", "../data/sounds/raw/sub10", "../data/sounds/raw/sub11"]
+        self.all_path = ['../data/sounds/raw/sub1/sub1_', '../data/sounds/raw/sub2/sub2_', '../data/sounds/raw/sub3/sub3_', 
+                         '../data/sounds/raw/sub4/sub4_', '../data/sounds/raw/sub5/sub5_', '../data/sounds/raw/sub6/sub6_', 
+                         '../data/sounds/raw/sub7/sub7_', '../data/sounds/raw/sub8/sub8_', '../data/sounds/raw/sub9/sub9_', 
+                         '../data/sounds/raw/sub10/sub10_', '../data/sounds/raw/sub11/sub11_']
         
         potential = Potential()
         potential.load('../data/ranking', key)
         score = potential.score
         
         if self.model_type == 'IMU_VAE':
-            self.all_path = ["../data/3DM_GX3s/raw/sub2", "../data/3DM_GX3s/raw/sub3", "../data/3DM_GX3s/raw/sub4",
-                            "../data/3DM_GX3s/raw/sub5", "../data/3DM_GX3s/raw/sub6", "../data/3DM_GX3s/raw/sub7", "../data/3DM_GX3s/raw/sub8",
-                            "../data/3DM_GX3s/raw/sub9", "../data/3DM_GX3s/raw/sub10", "../data/3DM_GX3s/raw/sub11",]
-            score = np.delete(score, 0)
+            self.all_path = ['../data/3DM_GX3s/raw/sub2/sub2_', '../data/3DM_GX3s/raw/sub3/sub3_', 
+                             '../data/3DM_GX3s/raw/sub4/sub4_', '../data/3DM_GX3s/raw/sub5/sub5_', '../data/3DM_GX3s/raw/sub6/sub6_', 
+                             '../data/3DM_GX3s/raw/sub8/sub8_', '../data/3DM_GX3s/raw/sub9/sub9_', 
+                             '../data/3DM_GX3s/raw/sub11/sub11_']
+            score = np.delete(score, [0, 6, 9])
         
         idx = np.argsort(score).tolist()
         self.score = np.ones(len(idx), dtype='int')
@@ -49,16 +51,16 @@ class Generalization_Performance():
             
     def check(self, exception):
         if self.model_type == 'VAE':
-            vae = VAE_trainer()
+            vae = VAE_trainer(beta=20)
         elif self.model_type == 'IMU_VAE':
-            vae = IMU_VAE_trainer()
+            vae = IMU_VAE_trainer(beta=20)
         for i, (path, score) in enumerate(zip(self.all_path, self.score)):
             if i != exception:
-                vae.dataset.load_npz(path, self.key, score)
+                vae.dataset.load_npz(path+self.key+'.npz', score)
         vae.dataset.normalize()
-        vae.auto_train(100)
+        vae.auto_train(1000)
         vae.dataset.clear()
-        vae.dataset.load_npz(self.all_path[exception], self.key, self.score[exception])
+        vae.dataset.load_npz(self.all_path[exception]+self.key+'.npz', self.score[exception])
         vae.dataset.normalize()
         vae.valid_loader = torch.utils.data.DataLoader(vae.dataset, batch_size=len(vae.dataset), shuffle=False)
         v_loss, v_loss_vae, v_loss_classifier, v_acc = vae.valid(1)
@@ -89,28 +91,18 @@ class Generalization_Performance():
         plt.savefig('../result/' + self.model_type + '/' + self.key + '/generalization.png')
 
 
-def IMU_all():
-    gene = Generalization_Performance('IMU_VAE', 'drive')
-    gene.check_all()
-    del gene
-    gene = Generalization_Performance('IMU_VAE', 'block')
-    gene.check_all()
-    del gene
-    gene = Generalization_Performance('IMU_VAE', 'push')
-    gene.check_all()
-    del gene
-    gene = Generalization_Performance('IMU_VAE', 'stop')
-    gene.check_all()
-    del gene
-    gene = Generalization_Performance('IMU_VAE', 'flick')
+def test_gp(model, key):
+    gene = Generalization_Performance(model, key)
     gene.check_all()
     del gene
 
 
 if __name__ == "__main__":
-    model = ['IMU_VAE', 'VAE']
-    key = ['drive', 'block', 'push', 'stop', 'flick']
-    IMU_all()
+    models = ['IMU_VAE', 'VAE']
+    keys = ['drive', 'block', 'push', 'stop', 'flick']
+    for model in models:
+        for key in keys:
+            test_gp(model, key)
 
 
 

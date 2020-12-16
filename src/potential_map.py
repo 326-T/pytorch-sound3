@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import Axes3D
 
-from modules.potential import Potential
+from modules.potential import Potential, MRA_Potential, GMM_Potential
 from vae import VAE, VAE_trainer
 from imu_vae import IMU_VAE, IMU_VAE_trainer
 from modules.myfunc import ans2index_label_color_marker
@@ -25,15 +25,22 @@ from modules.myfunc import ans2index_label_color_marker
 
 class Potential_Map():
     
-    def __init__(self, model, tech, dim=4):
+    def __init__(self, model, tech, mode = 'MRA', dim=4):
         self.model_type = model
         self.tech = tech
-        self.potential = Potential()
+        self.mode = mode
+        if self.mode == 'MRA':
+            self.potential = MRA_Potential()
+        elif self.mode == 'GMM':
+            self.potential = GMM_Potential()
+        
         self.potential.load('../data/ranking', tech)
+        
         if self.model_type == "VAE":
             self.vae = VAE_trainer()
         elif self.model_type == "IMU_VAE":
             self.vae = IMU_VAE_trainer()
+        
         self.vae.load_weight(load_path =  '../result/' + self.model_type + '/' + self.tech + '/vae')
         self.vae.load(tech)
         _, self.Y, self.X = self.vae.plot_z(save_path = '../result/' + self.model_type + '/' + self.tech + '/z_map.png')
@@ -64,25 +71,33 @@ class Potential_Map():
         
         ani = animation.FuncAnimation(fig, spin_graph, frames = 360, interval=50)
         #plt.show()
-        ani.save('../result/' + self.model_type + '/' + self.tech + '/potential.mp4', writer="ffmpeg", dpi=100)
+        if self.mode == 'MRA':
+            ani.save('../result/' + self.model_type + '/' + self.tech + '/potential_MRA.mp4', writer="ffmpeg", dpi=100)
+        elif self.mode == 'GMM':
+            ani.save('../result/' + self.model_type + '/' + self.tech + '/potential_GMM.mp4', writer="ffmpeg", dpi=100)
 
 
-def plot_potential(model, tech, dim=4):
-    pmap = Potential_Map(model, tech, dim)
+def plot_potential(model, tech, mode, dim=4):
+    pmap = Potential_Map(model, tech, mode, dim=dim)
     pmap.plot()
     del pmap
 
 
-def plot_all(models, keys):
+def plot_all(models, keys, mode, dim):
     for model in models:
         for key in keys:
-            plot_potential(model, key)
+            for md in mode:
+                plot_potential(model, key, md, dim)
 
 
 if __name__ == "__main__":
-    models = ['IMU_VAE', 'VAE']
+    models = ['VAE']
     keys = ['drive', 'block', 'push', 'stop', 'flick']
-    plot_all(models, keys, 4)    
+    mode = ['GMM']
+    for model in models:
+        for key in keys:
+            for md in mode:
+                plot_potential(model, key, md, 3)
 
 
 
