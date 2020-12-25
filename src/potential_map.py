@@ -18,8 +18,9 @@ import matplotlib.animation as animation
 from mpl_toolkits.mplot3d import Axes3D
 
 from modules.potential import Potential, MRA_Potential, GMM_Potential
-from vae import VAE, VAE_trainer
-from imu_vae import IMU_VAE, IMU_VAE_trainer
+from vae import VAE, VAE_Trainer
+from vdann import VDANN, VDANN_Trainer
+from imu_vae import IMU_VAE, IMU_VAE_Trainer
 from modules.myfunc import ans2index_label_color_marker
 
 
@@ -37,20 +38,24 @@ class Potential_Map():
         self.potential.load('../data/ranking', tech)
         
         if self.model_type == "VAE":
-            self.vae = VAE_trainer()
+            self.vae = VAE_Trainer()
+            self.vae.load_weight(load_path =  '../result/' + self.model_type + '/' + self.tech + '/vae')
+        elif self.model_type == "VDANN":
+            self.vae = VDANN_Trainer()
+            self.vae.load_weight(load_path =  '../result/' + self.model_type + '/' + self.tech + '/vdann')
         elif self.model_type == "IMU_VAE":
-            self.vae = IMU_VAE_trainer()
+            self.vae = IMU_VAE_Trainer()
+            self.vae.load_weight(load_path =  '../result/' + self.model_type + '/' + self.tech + '/vae')
         
-        self.vae.load_weight(load_path =  '../result/' + self.model_type + '/' + self.tech + '/vae')
         self.vae.load(tech)
-        _, self.Y, self.X = self.vae.plot_z(save_path = '../result/' + self.model_type + '/' + self.tech + '/z_map.png')
+        _, self.Y, self.X = self.vae.export_latent_space(save_path = '../result/' + self.model_type + '/' + self.tech + '/z_map.png')
         self.potential.fit(self.X, self.Y, dim)
     
     def plot(self):
         fig = plt.figure(figsize=(20,12))
         ax1 = fig.add_subplot(1,2,1, projection='3d')
-        x = np.arange(self.potential.min[0], self.potential.max[0], 0.01)
-        y = np.arange(self.potential.min[1], self.potential.max[1], 0.01)
+        x = np.arange(self.potential.min[0], self.potential.max[0], 0.001)
+        y = np.arange(self.potential.min[1], self.potential.max[1], 0.001)
         x, y = np.meshgrid(x, y)
         z = self.potential.transform(np.stack([x.reshape(-1), y.reshape(-1)], 1))
         z = z.reshape(x.shape)
@@ -91,9 +96,9 @@ def plot_all(models, keys, mode, dim):
 
 
 if __name__ == "__main__":
-    models = ['VAE']
-    keys = ['drive', 'block', 'push', 'stop', 'flick']
-    mode = ['GMM']
+    models = ['VDANN']
+    keys = ['drive','block','push','stop','flick']
+    mode = ['GMM', 'MRA']
     for model in models:
         for key in keys:
             for md in mode:

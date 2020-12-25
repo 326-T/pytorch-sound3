@@ -43,6 +43,9 @@ class MyDataset(Dataset):
             self.results.append(tournament)
         self.score = np.zeros(self.results[0].participants)
         self.calc_score()
+        idx = np.argsort(self.score).tolist()
+        self.high_low = np.ones(len(idx), dtype='int')
+        self.high_low[idx[:int((len(idx)+1)/2)]] = 0
         
     def calc_score(self):
         for result in self.results:
@@ -87,7 +90,8 @@ class MyDataset(Dataset):
         self.data_min = np.min(self.data)
         self.data = (self.data - self.data_min) / (self.data_max - self.data_min)
         self.data_num = len(self.data)
-    
+        self.ans = self.ans.astype(int)
+
     def clear(self):
         self.filenames.clear()
         self.results.clear()
@@ -95,11 +99,12 @@ class MyDataset(Dataset):
         self.data_num = 0
     
     def export_npz(self, save_path):
-        np.savez(save_path, data = self.data, ans = self.ans, score = self.score, filenames = np.array(self.filenames))
+        np.savez(save_path, data = self.data, ans = self.ans, score = self.score, binary = self.binary, filenames = np.array(self.filenames))
         
     def load_npz(self, load_path, ans=None, score=None):
         npz = np.load(load_path, allow_pickle=True)
         data = npz['data']
+        binary = npz['binary']
         filenames = npz['filenames'].tolist()
         if ans is not None:
             ans = np.full(len(data), ans)
@@ -108,7 +113,6 @@ class MyDataset(Dataset):
         if score is not None:
             score = np.full(len(data), score)
         else:
-            #score = np.full(len(data), self.score[int(load_path.split('/sub')[-1].split('_')[0])-1])
             score = npz['score']
         
         if(self.init_flag):
@@ -116,12 +120,14 @@ class MyDataset(Dataset):
             self.data = data
             self.ans = ans
             self.score = score
+            self.binary = binary
             self.init_flag = False
         else:
             self.filenames += filenames
             self.data = np.concatenate([self.data, data])
             self.ans = np.concatenate([self.ans, ans])
             self.score = np.concatenate([self.score, score])
+            self.binary = np.concatenate([self.binary, binary])
 
     def __len__(self):
         return self.data_num
@@ -129,10 +135,11 @@ class MyDataset(Dataset):
     def __getitem__(self, idx):
         out_data = self.data[idx]
         if self.mode == 'label':
-            out = self.ans[idx]
+            return self.data[idx], self.ans[idx]
         elif self.mode == 'score':
-            out = self.score[idx]
-        return out_data, out
+            return self.data[idx], self.score[idx]
+        elif self.mode == 'DANN':
+            return self.data[idx], self.binary[idx], self.ans[idx]    
 
 
 class SoundDataset(MyDataset):
@@ -141,12 +148,22 @@ class SoundDataset(MyDataset):
         super().__init__(dim, data_size, transform, mode)
 
 
+class SoundDataset2(SoundDataset):
+    
+    def __getitem__(self, idx):
+        out_data = self.data[idx][0:4:2]
+        if self.mode == 'label':
+            out = self.ans[idx]
+        elif self.mode == 'score':
+            out = self.score[idx]
+        return out_data, out
+
+
 class IMUDataset(MyDataset):
     
     def __init__(self, dim=11, data_size = 100, transform = None, mode = 'label'):
         super().__init__(dim, data_size, transform, mode)
         self.columns = ['Pitch Y', 'Roll X', 'Heading Z', 'Acc X', 'Acc Y', 'Acc Z', 'AR X', 'AR Y', 'AR Z']
-
 
 def csv2npz_all():
     def csv2npz(model, name, key, label):
@@ -171,7 +188,7 @@ def csv2npz_all():
 
 
 def add_score_all():
-    def add_score(model, name, key, label):
+    def add_score(model, name, key):
         if model == '3DM_GX3s':
             if name == 'sub1' or name == 'sub7' or name == 'sub10':
                 return 1
@@ -179,7 +196,7 @@ def add_score_all():
         elif model == 'sounds':
             dataset = SoundDataset()
         dataset.load_score('../../data/ranking', key)
-        dataset.load_npz('../../data/'+model+'/raw/'+name+'/'+name+'_'+key+'.npz', ans=label)
+        dataset.load_npz('../../data/'+model+'/raw/'+name+'/'+name+'_'+key+'.npz')
         dataset.export_npz('../../data/'+model+'/raw/'+name+'/'+name+'_'+key+'.npz')
         del dataset
     
@@ -195,25 +212,16 @@ def add_score_all():
         dataset.export_npz('../../data/'+model+'/raw/'+key+'.npz')
         del dataset
 
-    models = ['3DM_GX3s']
+    models = ['sounds', '3DM_GX3s']
     names = ['sub1', 'sub2', 'sub3', 'sub4', 'sub5', 'sub6', 'sub7', 'sub8', 'sub9', 'sub10', 'sub11']
     keys = ['drive', 'block', 'push', 'stop', 'flick']
     for model in models:
         for key in keys:
-            for name in names:
-                add_score(model, name, key, int(name.split('sub')[-1]))
+            #for name in names:
+                #add_score(model, name, key)
             merge_npz(model, key, names)
 
 
 if __name__ == "__main__":
     add_score_all()
-
-
-
-
-
-
-
-
-
 

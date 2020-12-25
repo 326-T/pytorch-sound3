@@ -25,6 +25,7 @@ class Potential():
     
     def __init__(self):
         self.results = []
+        self.ranks = []
     
     def load(self, path, key):
         filenames = [temp for temp in os.listdir(path) if ('.csv' in temp and key in temp)]
@@ -33,7 +34,9 @@ class Potential():
             tournament = Swiss_System_Tournament()
             tournament.Load(path + '/' + filename)
             self.results.append(tournament)
+            self.ranks.append([int(temp.split('選手')[-1]) for temp in tournament.vs_table.columns.values if '選手' in temp])
         self.score = np.zeros(self.results[0].participants)
+        self.rank = np.argsort(np.mean(self.ranks, axis=0))
         self.calc_score()
         
     def calc_score(self):
@@ -79,36 +82,40 @@ class MRA_Potential(Potential):
 class GMM_Potential(Potential):
     
     def fit(self, X, Y, dim = 0): # dim is dummy
+        self.max = X.max(axis=0)
+        self.min = X.min(axis=0)
         idxs, _, _, _, = ans2index_label_color_marker(Y)
         self.gauss = []
         for i in range(len(idxs)-1):
-            gauss.append(MultiDimGauss(X[idxs[i]:idxs[i+1]], label2score(Y[idxs[i]])))
+            self.gauss.append(MultiDimGauss(X[idxs[i]:idxs[i+1]], self.score[int(Y[idxs[i]])]))
             
     def transform(self, X):
         Y = np.zeros(len(X), dtype=float)
         for i, x in enumerate(X):
+            temp = []
             for gauss in self.gauss:
-                Y[i] += gauss.calc(x)
+                temp.append(gauss.calc(x))
+            Y[i] = np.max(temp)
         if len(Y) == 1:
             return Y[0]
         else:
             return Y
-        
+
 
 
 class MultiDimGauss():
     
     def __init__(self, X, k=1):
-        self.Mean = np.matrix(np.mean(X, axis=1))
-        self.Sigma = np.cov(X.T)
+        self.Mean = np.matrix(np.mean(X, axis=0))
+        self.Sigma = np.matrix(np.cov(X.T))
         self.k = k
     
     def calc(self, _X):
         X = np.matrix(_X)
         a = np.sqrt(np.linalg.det(self.Sigma)*(2*np.pi)**self.Sigma.ndim)
-        b = np.linalg.det(-0.5*(X - self.Mean)*Self.Sigma.I*(X - self.Mean).T)
+        b = np.linalg.det(-0.5*(X - self.Mean)*self.Sigma.I*(X - self.Mean).T)
         return self.k*np.exp(b)/a
-        
+
 
 
 if __name__ == "__main__":
