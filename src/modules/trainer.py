@@ -33,64 +33,82 @@ class Sound_Trainer(Trainer):
         self.dataset.load_npz('../data/sounds/raw/'+key+'.npz')
         self.dataset.normalize()
 
-    def plot_z(self, all_z, all_ans, save_path):
+    def plot_z(self, all_z, all_ans, save_path, mesh_z=None, mesh_ans=None):
         # LDA
         self.lda = LDA(n_components = 2)
         self.lda.fit(all_z, all_ans)
         lda_z = self.lda.transform(all_z)
         lda_z = lda_z.transpose()
+        if mesh_z is not None:
+            mesh_lda_z = self.lda.transform(mesh_z)
+            mesh_lda_z.transpose()
         
-        z_xrange = [np.min(lda_z[0]), np.max(lda_z[0])]
-        z_yrange = [np.min(lda_z[1]), np.max(lda_z[1])]        
-        self.plot_z_simple(lda_z[0], lda_z[1], all_ans, self.dataset.score, "z map", save_path.split('.png')[0] + '_LDA.png', z_xrange, z_yrange)
+        self.plot_z_simple(lda_z[0], lda_z[1], all_ans, self.dataset.score, "z map", save_path.split('.png')[0] + '_LDA.png',
+                        mesh_z = mesh_lda_z, mesh_ans = mesh_ans)
         self.plot_z_each(lda_z, all_ans, self.dataset.score, self.dataset.filenames, '../data/succeed_list_sound.csv', "z map",
-                        save_path.split('.png')[0] + '_LDA_each.png', z_xrange, z_yrange)
+                        save_path.split('.png')[0] + '_LDA_each.png', mesh_z = mesh_lda_z, mesh_ans = mesh_ans)
         
         # ICA
         self.ica = FastICA(n_components = 2, max_iter=1000)
         self.ica.fit(all_z)
         ica_z = self.ica.transform(all_z)
         ica_z = ica_z.transpose()
-        
-        z_xrange = [np.min(ica_z[0]), np.max(ica_z[0])]
-        z_yrange = [np.min(ica_z[1]), np.max(ica_z[1])]        
-        self.plot_z_simple(ica_z[0], ica_z[1], all_ans, self.dataset.score, "z map", save_path.split('.png')[0] + '_ICA.png', z_xrange, z_yrange)
+        if mesh_z is not None:
+            mesh_lda_z = self.lda.transform(mesh_z)
+            mesh_lda_z.transpose()
+
+        self.plot_z_simple(ica_z[0], ica_z[1], all_ans, self.dataset.score, "z map", save_path.split('.png')[0] + '_ICA.png',
+                        mesh_z = mesh_lda_z, mesh_ans = mesh_ans)
         self.plot_z_each(ica_z, all_ans, self.dataset.score, self.dataset.filenames, '../data/succeed_list_sound.csv', "z map",
-                        save_path.split('.png')[0] + '_ICA_each.png', z_xrange, z_yrange)
+                        save_path.split('.png')[0] + '_ICA_each.png', mesh_z = mesh_lda_z, mesh_ans = mesh_ans)
         return ica_z.transpose()
 
-    def plot_z_simple(self, x, y, ans, score, title, save_path, xrange=None, yrange=None):
+    def plot_z_simple(self, z, ans, score, title, save_path, mesh_z=None, mesh_ans=None):
+        if mesh_z is not None:
+            z_xrange = [np.min([np.min(z[0]), np.min(mesh_z[0])]), np.max([np.max(z[0]), np.max(mesh_z[0])])]
+            z_xrange = [np.min([np.min(z[1]), np.min(mesh_z[1])]), np.max([np.max(z[1]), np.max(mesh_z[1])])]
+            
+        z_xrange = [np.min(z[0]), np.max(z[0])]
+        z_yrange = [np.min(z[1]), np.max(z[1])] 
         plt.figure(figsize=(8, 8))
-        if xrange is not None:
-            plt.xlim(xrange[0], xrange[1])
-        if yrange is not None:
-            plt.ylim(yrange[0], yrange[1])
+        plt.xlim(z_xrange[0], z_xrange[1])
+        plt.ylim(z_yrange[0], z_yrange[1])
+        if mesh_z is not None:
+            idxs, labels, colors, markers = ans_score2index_label_color_marker(mesh_ans, score)
+            for i, (label, color, marker) in enumerate(zip(labels,colors,markers)):
+                plt.scatter(mesh_z[0,idxs[i]:idxs[i+1]], mesh_z[1,idxs[i]:idxs[i+1]], alpha=0.3, color=color, marker="o")
         idxs, labels, colors, markers = ans_score2index_label_color_marker(ans, score)
         for i, (label, color, marker) in enumerate(zip(labels,colors,markers)):
-            plt.scatter(x[idxs[i]:idxs[i+1]], y[idxs[i]:idxs[i+1]], label=label, s=10, color=color, marker=marker)
+            plt.scatter(z[0,idxs[i]:idxs[i+1]], z[1,idxs[i]:idxs[i+1]], label=label, s=10, color=color, marker=marker)
         plt.title(title)
         plt.legend()
         plt.tight_layout()
         plt.savefig(save_path)
         plt.close()
 
-    def plot_z_each(self, data, ans, score, names, sf_filepath, title, save_path, xrange=None, yrange=None):
-        data_list = results_list(data, ans, names)
+    def plot_z_each(self, z, ans, score, names, sf_filepath, title, save_path, mesh_z=None, mesh_ans=None):
+        data_list = results_list(z, ans, names)
         data_list.classify(sf_filepath)
         
         # the number of the classes == 11
         fig, ax = plt.subplots(4, 3, figsize=(24,32))
         ax[0][0].set_title('All', fontsize=20)
-        if xrange is not None:
-            for i in range(0,12):
-                ax[i//3][i%3].set_xlim(xrange[0], xrange[1])
-        if yrange is not None:
-            for i in range(1,12):
-                ax[i//3][i%3].set_ylim(yrange[0], yrange[1])
+        if mesh_z is not None:
+            z_xrange = [np.min([np.min(z[0]), np.min(mesh_z[0])]), np.max([np.max(z[0]), np.max(mesh_z[0])])]
+            z_xrange = [np.min([np.min(z[1]), np.min(mesh_z[1])]), np.max([np.max(z[1]), np.max(mesh_z[1])])]
+        z_xrange = [np.min(z[0]), np.max(z[0])]
+        z_yrange = [np.min(z[1]), np.max(z[1])] 
+        for i in range(0,12):
+            ax[i//3][i%3].set_xlim(z_xrange[0], z_xrange[1])
+            ax[i//3][i%3].set_ylim(z_yrange[0], z_yrange[1])
                 
+        if mesh_z is not None:
+            idxs, labels, colors, markers = ans_score2index_label_color_marker(mesh_ans, score)
+            for i, (label, color, marker) in enumerate(zip(labels,colors,markers)):
+                ax[0][0].scatter(mesh_z[0,idxs[i]:idxs[i+1]], mesh_z[1,idxs[i]:idxs[i+1]], alpha=0.3, color=color, marker="o")
         idxs, labels, colors, markers = ans_score2index_label_color_marker(ans, score)
         for i, (label, color, marker) in enumerate(zip(labels,colors,markers)):
-            ax[0][0].scatter(data[0,idxs[i]:idxs[i+1]], data[1,idxs[i]:idxs[i+1]], label=label, s=20, color=color, marker=marker)
+            ax[0][0].scatter(z[0,idxs[i]:idxs[i+1]], z[1,idxs[i]:idxs[i+1]], label=label, s=20, color=color, marker=marker)
         ax[0][0].legend()
         ax[0][0].set_title(title, fontsize=20)
 
@@ -132,20 +150,26 @@ class IMU_Trainer(Sound_Trainer):
         self.dataset.load_npz('../data/3DM_GX3s/raw/'+key+'.npz')
         self.dataset.normalize()
 
-    def plot_z_each(self, data, ans, score, names, sf_filepath, title, save_path, xrange=None, yrange=None):
-        data_list = results_list(data, ans, names)
+    def plot_z_each(self, z, ans, score, names, sf_filepath, title, save_path):
+        data_list = results_list(z, ans, names)
         data_list.classify(sf_filepath)
         
         # the number of the classes == 11
         fig, ax = plt.subplots(3, 3, figsize=(24,24))
         ax[0][0].set_title('All', fontsize=20)
-        if xrange is not None:
-            for i in range(0,9):
-                ax[i//3][i%3].set_xlim(xrange[0], xrange[1])
-        if yrange is not None:
-            for i in range(0,9):
-                ax[i//3][i%3].set_ylim(yrange[0], yrange[1])
-                
+        if mesh_z is not None:
+            z_xrange = [np.min([np.min(z[0]), np.min(mesh_z[0])]), np.max([np.max(z[0]), np.max(mesh_z[0])])]
+            z_xrange = [np.min([np.min(z[1]), np.min(mesh_z[1])]), np.max([np.max(z[1]), np.max(mesh_z[1])])]
+        z_xrange = [np.min(z[0]), np.max(z[0])]
+        z_yrange = [np.min(z[1]), np.max(z[1])] 
+        for i in range(0,9):
+            ax[i//3][i%3].set_xlim(z_xrange[0], z_xrange[1])
+            ax[i//3][i%3].set_ylim(z_yrange[0], z_yrange[1])
+
+        if mesh_z is not None:
+            idxs, labels, colors, markers = ans_score2index_label_color_marker(mesh_ans, score)
+            for i, (label, color, marker) in enumerate(zip(labels,colors,markers)):
+                ax[0][0].scatter(mesh_z[0,idxs[i]:idxs[i+1]], mesh_z[1,idxs[i]:idxs[i+1]], alpha=0.3, color=color, marker="o")        
         idxs, labels, colors, markers = ans_score2index_label_color_marker(ans, score)
         for i, (label, color, marker) in enumerate(zip(labels,colors,markers)):
             ax[0][0].scatter(data[0,idxs[i]:idxs[i+1]], data[1,idxs[i]:idxs[i+1]], label=label, s=20, color=color, marker=marker)

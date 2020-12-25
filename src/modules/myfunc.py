@@ -204,6 +204,21 @@ def calc_corr(path, keys):
         ax.invert_yaxis()
         plt.savefig(path+'/correlation_coach'+str(i+1)+'.png')
 
+def make_meshgrid(z):
+    dim = len(z[0])
+    z_max = np.max(z, axis=0)
+    z_min = np.min(z, axis=0)
+    temp=[]
+    for i in range(5):
+        temp.append(np.arange(z_min[i], z_max[i], (z_max[i]-z_min[i])/1e2))
+    
+    mesh = np.meshgrid(*temp)
+    mesh = np.array(mesh)
+    print(mesh.shape)
+
+
 if __name__=="__main__":
-    keys = ['drive', 'block', 'push', 'stop', 'flick']
-    calc_corr('../../data/ranking', keys)
+    #keys = ['drive', 'block', 'push', 'stop', 'flick']
+    #calc_corr('../../data/ranking', keys)
+    x = np.arange(60).reshape(20, -1)
+    make_meshgrid(x)

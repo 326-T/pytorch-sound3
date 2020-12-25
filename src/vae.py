@@ -23,6 +23,7 @@ import pandas as pd
 
 from modules.dataset import MyDataset, SoundDataset
 from modules.trainer import Sound_Trainer
+from modules.myfunc import make_meshgrid
 
 class VAE(nn.Module):
     def __init__(self,input_shape,z_shape=20,output_shape=11,beta=10):
@@ -110,6 +111,12 @@ class VAE(nn.Module):
         
         return pre_x, y, mu, logvar
     
+    def classify(self, z):
+        y = self.classifier(z.view(-1, self.z_shape))
+        y = y.view(-1,self.output_shape)
+
+        return y
+
     def loss_function_vae(self, rec_x, x, mu, logvar):
         BCE = F.binary_cross_entropy(rec_x, x.float(), reduction='sum')
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
@@ -269,7 +276,15 @@ class VAE_Trainer(Sound_Trainer):
         all_z = np.array(all_z).reshape(-1, self.model.z_shape)
         all_ans = np.array(all_ans).reshape(-1)
 
-        ica = self.plot_z(all_z, all_ans, save_path)        
+        mesh_z = make_meshgrid(all_z)
+        mesh = torch.from_numpy(mesh_z.astype('float')).clone()
+        mesh = mesh.to(self.device)
+        mesh_ans = self.model.classify(mesh)
+        mesh_ans = mesh_ans.to('cpu').clone().numpy()
+        idx = np.argsort(mesh_ans)
+        mesh_z = mesh_z[idx]
+
+        ica = self.plot_z(all_z, all_ans, save_path, mesh_z, mesh_ans)        
         return all_z, all_ans, ica
 
     def reconstruct(self, save_path = '../result/VAE/reconstructed_sounds'):
@@ -294,9 +309,15 @@ def train_VAE(key):
     vae.save_weight(save_path = '../result/VAE/' + key + '/vae')
     del vae
 
+def plot_latent_VAE(key):
+    vae = VAE_Trainer()
+    vae.load_weight(load_path =  '../result/VAE/' + key + '/vae')
+    vae.load(key)
+    vae.export_latent_space(save_path = '../result/VAE/' + key + '/z_map.png')
+    del vae
 
 def reconstruct_VAE(key):
-    vae = VAE_Trainer(beta=10)
+    vae = VAE_Trainer()
     vae.load_weight(load_path =  '../result/VAE/' + key + '/vae')
     vae.load(key)
     vae.reconstruct(save_path = '../result/VAE/' + key + '/reconstructed')
@@ -350,8 +371,7 @@ def Grad_CAM_VAE(key):
 if __name__ == "__main__":
     keys = ['drive', 'block', 'push', 'stop', 'flick']
     for key in keys:
-        train_VAE(key)
-        Grad_CAM_VAE(key)
+        plot_latent_VAE(key)
 
 
 

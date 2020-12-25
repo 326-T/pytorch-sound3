@@ -101,6 +101,12 @@ class IMU_VAE(nn.Module):
         
         return pre_x, y, mu, logvar
     
+    def classify(self, z):
+        y = self.classifier(z.view(-1, self.z_shape))
+        y = y.view(-1,self.output_shape)
+
+        return y
+        
     def loss_function_vae(self, rec_x, x, mu, logvar):
         BCE = F.binary_cross_entropy(rec_x, x.float(), reduction='sum')
         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())

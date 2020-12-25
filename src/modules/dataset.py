@@ -104,7 +104,7 @@ class MyDataset(Dataset):
     def load_npz(self, load_path, ans=None, score=None):
         npz = np.load(load_path, allow_pickle=True)
         data = npz['data']
-        binary = npz['binary']
+        #binary = npz['binary']
         filenames = npz['filenames'].tolist()
         if ans is not None:
             ans = np.full(len(data), ans)
@@ -120,14 +120,14 @@ class MyDataset(Dataset):
             self.data = data
             self.ans = ans
             self.score = score
-            self.binary = binary
+            #self.binary = binary
             self.init_flag = False
         else:
             self.filenames += filenames
             self.data = np.concatenate([self.data, data])
             self.ans = np.concatenate([self.ans, ans])
             self.score = np.concatenate([self.score, score])
-            self.binary = np.concatenate([self.binary, binary])
+            #self.binary = np.concatenate([self.binary, binary])
 
     def __len__(self):
         return self.data_num
@@ -164,6 +164,7 @@ class IMUDataset(MyDataset):
     def __init__(self, dim=11, data_size = 100, transform = None, mode = 'label'):
         super().__init__(dim, data_size, transform, mode)
         self.columns = ['Pitch Y', 'Roll X', 'Heading Z', 'Acc X', 'Acc Y', 'Acc Z', 'AR X', 'AR Y', 'AR Z']
+
 
 def csv2npz_all():
     def csv2npz(model, name, key, label):
